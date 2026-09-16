@@ -123,9 +123,7 @@ export function ManagePage() {
   const eventTicketTypes = ticketTypes.filter(
     (type) => type.event_id === inventoryEventId,
   );
-  const eventTickets = tickets.filter((ticket) =>
-    eventTicketTypes.some((type) => type.id === ticket.ticket_type_id),
-  );
+  const eventTickets = tickets.filter((ticket) => ticket.event_id === inventoryEventId);
   const eventSeats = seats.filter(
     (seat) => seat.venue_id === inventoryEvent?.venue_id,
   );
@@ -351,9 +349,14 @@ export function ManagePage() {
             },
           ],
           submit: async (data) => {
+            const eventId = inventoryEvent?.id ?? ticket?.event_id;
+            if (!eventId) {
+              throw new Error("Open an event’s ticketing screen before adding a ticket.");
+            }
             const body = {
               price: Math.round(Number(data.get("price")) * 100),
               seat_id: Number(data.get("seat_id")),
+              event_id: eventId,
               ticket_type_id: Number(data.get("ticket_type_id")),
             };
             const saved = ticket
@@ -527,6 +530,7 @@ export function ManagePage() {
         await api.post<Ticket>("/tickets/", {
           price: vipSeat ? 12500 : 4500,
           seat_id: seat.id,
+          event_id: event.id,
           ticket_type_id: vipSeat ? vip.id : ga.id,
         });
       }

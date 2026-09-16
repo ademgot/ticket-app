@@ -49,6 +49,7 @@ export type Ticket = {
   held_until: number | null;
   sold_at: number | null;
   seat_id: number;
+  event_id: number;
   ticket_type_id: number;
   created_at: number;
   updated_at: number;

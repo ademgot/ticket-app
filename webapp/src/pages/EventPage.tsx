@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import type {
@@ -37,17 +37,14 @@ export function EventPage() {
         setEvent(loadedEvent);
         setVenue(venues.find((item) => item.id === loadedEvent.venue_id) ?? null);
         setTicketTypes(types.filter((type) => type.event_id === loadedEvent.id));
-        setTickets(ticketList);
+        setTickets(ticketList.filter((ticket) => ticket.event_id === loadedEvent.id));
         setSeats(seatList);
         setClaimedIds(new Set(items.map((item) => item.ticket_id)));
       })
       .catch((err: Error) => setError(err.message));
   }, [eventId]);
 
-  const inventory = useMemo(() => {
-    const typeIds = new Set(ticketTypes.map((type) => type.id));
-    return tickets.filter((ticket) => typeIds.has(ticket.ticket_type_id));
-  }, [ticketTypes, tickets]);
+  const inventory = tickets;
 
   if (error) {
     return <p className="banner error">{error}</p>;

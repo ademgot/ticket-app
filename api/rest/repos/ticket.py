@@ -32,14 +32,15 @@ class TicketRepo:
             cursor.execute(
                 """
                 INSERT INTO tickets(
-                    price, held_until, sold_at, seat_id, ticket_type_id
-                ) VALUES (?, ?, ?, ?, ?)
+                    price, held_until, sold_at, seat_id, event_id, ticket_type_id
+                ) VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
                     ticket.price,
                     ticket.held_until,
                     ticket.sold_at,
                     ticket.seat_id,
+                    ticket.event_id,
                     ticket.ticket_type_id,
                 ),
             )

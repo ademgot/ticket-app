@@ -141,12 +141,14 @@ def _get_or_create_ticket_type(tier: str, event_id: int):
     return ticket_type
 
 
-def _get_or_create_ticket(price: int, seat_id: int, ticket_type_id: int, label: str):
+def _get_or_create_ticket(
+    price: int, seat_id: int, event_id: int, ticket_type_id: int, label: str
+):
     existing = next(
         (
             ticket
             for ticket in TicketRepo.get()
-            if ticket.seat_id == seat_id and ticket.ticket_type_id == ticket_type_id
+            if ticket.event_id == event_id and ticket.seat_id == seat_id
         ),
         None,
     )
@@ -155,7 +157,12 @@ def _get_or_create_ticket(price: int, seat_id: int, ticket_type_id: int, label: 
         return existing
     try:
         ticket = TicketRepo.create(
-            CreateTicket(price=price, seat_id=seat_id, ticket_type_id=ticket_type_id)
+            CreateTicket(
+                price=price,
+                seat_id=seat_id,
+                event_id=event_id,
+                ticket_type_id=ticket_type_id,
+            )
         )
     except IntegrityError:
         print(f"    ticket skipped {label} (conflict)")
@@ -215,6 +222,7 @@ def main() -> None:
                 _get_or_create_ticket(
                     prices[ticket_type.tier],
                     seat.id,
+                    event.id,
                     ticket_type.id,
                     label,
                 )

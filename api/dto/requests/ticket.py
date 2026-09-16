@@ -6,6 +6,7 @@ class CreateTicket(BaseModel):
     held_until: Optional[int] = Field(default=None)
     sold_at: Optional[int] = Field(default=None)
     seat_id: int = Field()
+    event_id: int = Field()
     ticket_type_id: int = Field()
 
 class UpdateTicket(BaseModel):
@@ -13,4 +14,5 @@ class UpdateTicket(BaseModel):
     held_until: Optional[int] = Field(default=None)
     sold_at: Optional[int] = Field(default=None)
     seat_id: Optional[int] = Field(default=None)
+    event_id: Optional[int] = Field(default=None)
     ticket_type_id: Optional[int] = Field(default=None)

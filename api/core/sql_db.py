@@ -17,13 +17,6 @@ def set_db_path(path: str) -> None:
 
 def migrate() -> None:
     with get_con() as con:
-        has_legacy_users = con.execute(
-            """
-            SELECT 1
-            FROM sqlite_master
-            WHERE type = 'table' AND name = 'user'
-            """
-        ).fetchone()
         con.executescript("""
             CREATE TABLE IF NOT EXISTS venues (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,7 +75,7 @@ def migrate() -> None:
                 ticket_type_id  INTEGER NOT NULL REFERENCES ticket_types(id),
                 created_at      INTEGER NOT NULL DEFAULT (unixepoch('now')),
                 updated_at      INTEGER NOT NULL DEFAULT (unixepoch('now')),
-                UNIQUE (ticket_type_id, event_id)
+                UNIQUE (event_id, seat_id)
             );
 
             CREATE TABLE IF NOT EXISTS orders (
@@ -129,15 +122,6 @@ def migrate() -> None:
             CREATE INDEX IF NOT EXISTS idx_tax_rates_lookup
                 ON tax_rates(jurisdiction, tax_type, effective_from, effective_to);
         """)
-        if has_legacy_users:
-            con.execute(
-                """
-                INSERT OR IGNORE INTO users(id, email, name, created_at, updated_at)
-                SELECT id, email, name, created_at, updated_at
-                FROM user
-                WHERE deleted_at IS NULL
-                """
-            )
         con.commit()
 
 
