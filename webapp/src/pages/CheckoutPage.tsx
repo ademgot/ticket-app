@@ -119,7 +119,7 @@ export function CheckoutPage() {
         await api.patch(`/tickets/${ticket.id}`, { sold_at: soldAt });
       }
       clear();
-      navigate(`/orders/${order.id}`);
+      navigate(`/user/orders/${order.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed");
     } finally {
@@ -137,7 +137,7 @@ export function CheckoutPage() {
         {error && <p className="banner error">{error}</p>}
         {selected.length === 0 ? (
           <p className="banner">
-            Nothing held. <Link to="/">Browse events</Link>
+            Nothing held. <Link to="/user">Browse events</Link>
           </p>
         ) : (
           <ul className="seat-list">

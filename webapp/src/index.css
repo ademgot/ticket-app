@@ -10,7 +10,7 @@
   --danger: #e36b5e;
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   font-family: "IBM Plex Sans", system-ui, sans-serif;
-  background: radial-gradient(circle at top, #3a2a1c 0%, #120e0b 42%, #0b0908 100%);
+  background: #0b0908;
   color: var(--ink);
 }
 
@@ -26,6 +26,7 @@ body,
 }
 
 body {
+  background: #0b0908;
   background-image: repeating-linear-gradient(
     -12deg,
     transparent,
@@ -33,6 +34,37 @@ body {
     rgba(224, 138, 60, 0.03) 18px,
     rgba(224, 138, 60, 0.03) 19px
   );
+}
+
+.app-view {
+  min-height: 100vh;
+  background-attachment: fixed;
+}
+
+.app-view--user {
+  background:
+    repeating-linear-gradient(
+      -12deg,
+      transparent,
+      transparent 18px,
+      rgba(224, 138, 60, 0.03) 18px,
+      rgba(224, 138, 60, 0.03) 19px
+    ),
+    radial-gradient(circle at top, #3a2a1c 0%, #120e0b 42%, #0b0908 100%);
+}
+
+.app-view--organizer {
+  --paper: #101c20;
+  --panel: #17292e;
+  --line: #315057;
+  --accent: #63cbd0;
+  --accent-ink: #0b2023;
+  --muted: #abc7c9;
+  background:
+    linear-gradient(rgba(99, 203, 208, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 203, 208, 0.025) 1px, transparent 1px),
+    radial-gradient(circle at top, #214750 0%, #101d21 45%, #091113 100%);
+  background-size: 24px 24px, 24px 24px, auto;
 }
 
 a {
@@ -114,6 +146,106 @@ nav a:hover {
   color: var(--ink);
   border-color: var(--line);
   background: rgba(255, 255, 255, 0.04);
+}
+
+.home-link {
+  margin-left: 8px;
+  border-color: var(--line);
+}
+
+.role-home {
+  min-height: 100vh;
+  padding: clamp(40px, 8vw, 100px) 20px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(224, 138, 60, 0.24), transparent 38%),
+    radial-gradient(circle at 85% 100%, rgba(99, 203, 208, 0.2), transparent 42%),
+    #0b0d0d;
+}
+
+.role-home__intro,
+.role-grid {
+  width: min(920px, 100%);
+  margin-inline: auto;
+}
+
+.role-home__intro {
+  margin-bottom: 34px;
+}
+
+.role-home__intro .brand-mark {
+  margin-bottom: 26px;
+}
+
+.role-home__intro h1 {
+  max-width: 720px;
+  margin: 0 0 12px;
+  font-size: clamp(2.3rem, 6vw, 4.6rem);
+  line-height: 1.02;
+}
+
+.role-home__intro > p:last-child {
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.role-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.role-card {
+  min-height: 310px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  transition: transform 160ms ease, border-color 160ms ease;
+}
+
+.role-card:hover {
+  transform: translateY(-4px);
+}
+
+.role-card--user {
+  background: linear-gradient(145deg, #342518, #1d1610);
+  border-color: #6b4728;
+}
+
+.role-card--organizer {
+  background: linear-gradient(145deg, #1c3d45, #111f23);
+  border-color: #386973;
+}
+
+.role-card__icon {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border: 1px solid currentColor;
+  font-size: 1.35rem;
+}
+
+.role-card--user .role-card__icon,
+.role-card--user > strong {
+  color: #efa75f;
+}
+
+.role-card--organizer .role-card__icon,
+.role-card--organizer > strong {
+  color: #78d7dc;
+}
+
+.role-card h2 {
+  margin: 0 0 10px;
+  font-size: 1.75rem;
+}
+
+.role-card p:not(.eyebrow) {
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .page-head {
@@ -336,7 +468,8 @@ select {
 
 @media (max-width: 800px) {
   .masthead,
-  .split {
+  .split,
+  .role-grid {
     grid-template-columns: 1fr;
     display: grid;
   }

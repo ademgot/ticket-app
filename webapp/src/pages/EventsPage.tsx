@@ -30,13 +30,13 @@ export function EventsPage() {
       {error && <p className="banner error">{error}</p>}
       {!error && events.length === 0 && (
         <p className="banner">
-          No events yet. Open Manage and load the sample house, or create a
-          venue and event yourself.
+          No events are on sale yet. Ask an organizer to create an event and
+          add ticket inventory.
         </p>
       )}
       <div className="event-grid">
         {events.map((event) => (
-          <Link key={event.id} className="event-card" to={`/events/${event.id}`}>
+          <Link key={event.id} className="event-card" to={`/user/events/${event.id}`}>
             <p className="eyebrow">{venueName(event.venue_id)}</p>
             <h2>{event.name}</h2>
             <p>

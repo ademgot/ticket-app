@@ -111,7 +111,7 @@ export function EventPage() {
         );
       })}
       <p className="footer-link">
-        Ready? <Link to="/checkout">Go to checkout</Link>
+        Ready? <Link to="/user/checkout">Go to checkout</Link>
       </p>
     </section>
   );

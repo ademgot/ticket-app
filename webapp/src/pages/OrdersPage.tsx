@@ -32,7 +32,7 @@ export function OrdersPage() {
       <ul className="order-list">
         {orders.map((order) => (
           <li key={order.id}>
-            <Link to={`/orders/${order.id}`}>
+            <Link to={`/user/orders/${order.id}`}>
               <strong>
                 #{order.id} · {buyer(order.user_id)}
               </strong>

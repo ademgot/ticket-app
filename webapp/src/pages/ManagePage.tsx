@@ -133,7 +133,8 @@ export function ManagePage() {
   return (
     <section>
       <div className="page-head">
-        <h1>Manage</h1>
+        <p className="eyebrow">Organizer workspace</p>
+        <h1>Run the box office</h1>
         <p>Stock the house: venues, seats, events, tickets, buyers, and tax.</p>
       </div>
       <div className="toolbar">
