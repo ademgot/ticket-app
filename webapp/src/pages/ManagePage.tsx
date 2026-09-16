@@ -59,6 +59,7 @@ const DELETE_PATH: Record<EntityKind, (id: number) => string> = {
 
 export function ManagePage() {
   const [tab, setTab] = useState<Tab>("house");
+  const [inventoryVenueId, setInventoryVenueId] = useState<number | null>(null);
   const [inventoryEventId, setInventoryEventId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
@@ -112,6 +113,11 @@ export function ManagePage() {
     value: String(venue.id),
     label: venue.name,
   }));
+  const inventoryVenue =
+    venues.find((venue) => venue.id === inventoryVenueId) ?? null;
+  const venueSeats = seats.filter(
+    (seat) => seat.venue_id === inventoryVenueId,
+  );
   const inventoryEvent =
     events.find((event) => event.id === inventoryEventId) ?? null;
   const eventTicketTypes = ticketTypes.filter(
@@ -172,19 +178,14 @@ export function ManagePage() {
       }
       case "seat": {
         const seat = record as Seat | undefined;
+        const venueId = seat?.venue_id ?? inventoryVenue?.id;
         return {
           title: editing ? "Edit seat" : "New seat",
-          description: "Seats belong to a venue and are reused across events.",
+          description: inventoryVenue
+            ? `A seat at ${inventoryVenue.name}, reused across events.`
+            : "Seats belong to a venue and are reused across events.",
           submitLabel: editing ? "Save seat" : "Create seat",
           fields: [
-            {
-              kind: "select",
-              name: "venue_id",
-              label: "Venue",
-              placeholder: "Choose a venue",
-              options: venueOptions,
-              defaultValue: seat ? String(seat.venue_id) : undefined,
-            },
             {
               kind: "text",
               name: "section",
@@ -208,11 +209,14 @@ export function ManagePage() {
             },
           ],
           submit: async (data) => {
+            if (venueId == null) {
+              throw new Error("Open a venue’s seating screen before adding a seat.");
+            }
             const body = {
               section: data.get("section"),
               seat_row: data.get("seat_row"),
               seat_number: data.get("seat_number"),
-              venue_id: Number(data.get("venue_id")),
+              venue_id: venueId,
             };
             const saved = seat
               ? await api.patch<Seat>(`/seats/${seat.id}`, body)
@@ -591,6 +595,7 @@ export function ManagePage() {
             className={tab === id ? "tab active" : "tab"}
             onClick={() => {
               setTab(id);
+              setInventoryVenueId(null);
               setInventoryEventId(null);
             }}
           >
@@ -599,42 +604,35 @@ export function ManagePage() {
         ))}
       </div>
 
-      {tab === "house" && (
-        <div className="split">
-          <Collection
-            title="Venues"
-            count={venues.length}
-            actionLabel="New venue"
-            onNew={() => openCreate("venue")}
-            empty="No venues yet. Create one to start building the house."
-          >
-            {venues.map((venue) => (
-              <li key={venue.id}>
-                <div>
-                  <strong>{venue.name}</strong>
-                  <span>
-                    {venue.address} · {venue.timezone}
-                  </span>
-                </div>
-                <RowActions
-                  onEdit={() => openEdit("venue", venue)}
-                  onDelete={() => openDelete("venue", venue.id, `venue “${venue.name}”`)}
-                />
-              </li>
-            ))}
-          </Collection>
+      {tab === "house" && inventoryVenue && (
+        <section>
+          <div className="panel event-inventory-head">
+            <button
+              type="button"
+              className="ghost compact"
+              onClick={() => setInventoryVenueId(null)}
+            >
+              ← All venues
+            </button>
+            <div>
+              <p className="eyebrow">Seating</p>
+              <h2>{inventoryVenue.name}</h2>
+              <p className="hint">
+                {inventoryVenue.address} · {inventoryVenue.timezone}
+              </p>
+            </div>
+          </div>
           <Collection
             title="Seats"
-            count={seats.length}
+            count={venueSeats.length}
             actionLabel="New seat"
             onNew={() => openCreate("seat")}
             empty="No seats yet. Seats are what tickets are sold against."
           >
-            {seats.map((seat) => (
+            {venueSeats.map((seat) => (
               <li key={seat.id}>
                 <div>
                   <strong>{seatLabel(seat)}</strong>
-                  <span>{venueName(seat.venue_id)}</span>
                 </div>
                 <RowActions
                   onEdit={() => openEdit("seat", seat)}
@@ -645,7 +643,52 @@ export function ManagePage() {
               </li>
             ))}
           </Collection>
-        </div>
+        </section>
+      )}
+
+      {tab === "house" && !inventoryVenue && (
+        <Collection
+          title="Venues"
+          count={venues.length}
+          actionLabel="New venue"
+          onNew={() => openCreate("venue")}
+          empty="No venues yet. Create one to start building the house."
+        >
+          {venues.map((venue) => {
+            const seatCount = seats.filter(
+              (seat) => seat.venue_id === venue.id,
+            ).length;
+            return (
+              <li key={venue.id}>
+                <div>
+                  <strong>{venue.name}</strong>
+                  <span>
+                    {venue.address} · {venue.timezone} · {seatCount} seats
+                  </span>
+                </div>
+                <RowActions
+                  extra={
+                    <button
+                      type="button"
+                      className="ghost compact"
+                      onClick={() => {
+                        setMessage(null);
+                        setError(null);
+                        setInventoryVenueId(venue.id);
+                      }}
+                    >
+                      Seats
+                    </button>
+                  }
+                  onEdit={() => openEdit("venue", venue)}
+                  onDelete={() =>
+                    openDelete("venue", venue.id, `venue “${venue.name}”`)
+                  }
+                />
+              </li>
+            );
+          })}
+        </Collection>
       )}
 
       {tab === "events" && inventoryEvent && (
@@ -705,7 +748,7 @@ export function ManagePage() {
                 eventTicketTypes.length === 0
                   ? "Add a ticket type first, then create seats for this event."
                   : eventSeats.length === 0
-                    ? "This venue has no seats yet. Add seats under Venues & seats."
+                    ? "This venue has no seats yet. Open the venue under Venues & seats and add them there."
                     : "No tickets yet for this event."
               }
             >
