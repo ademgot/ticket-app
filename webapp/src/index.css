@@ -403,6 +403,41 @@ nav a:hover {
   white-space: nowrap;
 }
 
+.row-actions,
+.row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.event-inventory-head {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.event-inventory-head h2 {
+  margin: 0;
+}
+
+.compact {
+  padding: 6px 10px;
+  font-size: 0.85rem;
+}
+
+.danger {
+  background: var(--danger);
+  color: #1a0c0b;
+  font-weight: 600;
+}
+
+.danger-ghost {
+  background: transparent;
+  color: #ffd4ce;
+  border: 1px solid var(--danger);
+}
+
 button {
   border: 0;
   cursor: pointer;

@@ -49,8 +49,7 @@ def migrate() -> None:
                 starts_at   INTEGER NOT NULL,
                 ends_at     INTEGER NOT NULL,
                 created_at  INTEGER NOT NULL DEFAULT (unixepoch('now')),
-                updated_at  INTEGER NOT NULL DEFAULT (unixepoch('now')),
-                CHECK (end > start)
+                updated_at  INTEGER NOT NULL DEFAULT (unixepoch('now'))
             );
 
             CREATE TABLE IF NOT EXISTS seats (
@@ -79,10 +78,11 @@ def migrate() -> None:
                 held_until      INTEGER,
                 sold_at         INTEGER,
                 seat_id         INTEGER NOT NULL REFERENCES seats(id),
+                event_id        INTEGER NOT NULL REFERENCES events(id),
                 ticket_type_id  INTEGER NOT NULL REFERENCES ticket_types(id),
                 created_at      INTEGER NOT NULL DEFAULT (unixepoch('now')),
                 updated_at      INTEGER NOT NULL DEFAULT (unixepoch('now')),
-                UNIQUE (ticket_type_id, seat_id)
+                UNIQUE (ticket_type_id, event_id)
             );
 
             CREATE TABLE IF NOT EXISTS orders (

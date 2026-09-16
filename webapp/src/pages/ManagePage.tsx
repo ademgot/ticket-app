@@ -9,7 +9,7 @@ import type {
   User,
   Venue,
 } from "../api/types";
-import { FormModal, type Field } from "../components/FormModal";
+import { ConfirmModal, FormModal, type Field } from "../components/FormModal";
 import {
   formatMoney,
   formatWhen,
@@ -21,9 +21,9 @@ import {
   toDatetimeLocal,
 } from "../lib/format";
 
-type Tab = "house" | "events" | "inventory" | "people" | "tax";
+type Tab = "house" | "events" | "people" | "tax";
 
-type Creatable =
+type EntityKind =
   | "venue"
   | "seat"
   | "event"
@@ -32,7 +32,9 @@ type Creatable =
   | "user"
   | "tax-rate";
 
-type CreateConfig = {
+type EntityRecord = Venue | Seat | Event | TicketType | Ticket | User | TaxRate;
+
+type FormConfig = {
   title: string;
   description: string;
   submitLabel: string;
@@ -40,9 +42,25 @@ type CreateConfig = {
   submit: (data: FormData) => Promise<string>;
 };
 
+type Dialog =
+  | { action: "create"; kind: EntityKind }
+  | { action: "edit"; kind: EntityKind; record: EntityRecord }
+  | { action: "delete"; kind: EntityKind; id: number; label: string };
+
+const DELETE_PATH: Record<EntityKind, (id: number) => string> = {
+  venue: (id) => `/venues/${id}`,
+  seat: (id) => `/seats/${id}`,
+  event: (id) => `/events/${id}`,
+  "ticket-type": (id) => `/ticket-types/${id}`,
+  ticket: (id) => `/tickets/${id}`,
+  user: (id) => `/users/${id}`,
+  "tax-rate": (id) => `/tax-rates/${id}`,
+};
+
 export function ManagePage() {
   const [tab, setTab] = useState<Tab>("house");
-  const [creating, setCreating] = useState<Creatable | null>(null);
+  const [inventoryEventId, setInventoryEventId] = useState<number | null>(null);
+  const [dialog, setDialog] = useState<Dialog | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [seats, setSeats] = useState<Seat[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -94,49 +112,70 @@ export function ManagePage() {
     value: String(venue.id),
     label: venue.name,
   }));
-  const eventOptions = events.map((event) => ({
-    value: String(event.id),
-    label: event.name,
-  }));
+  const inventoryEvent =
+    events.find((event) => event.id === inventoryEventId) ?? null;
+  const eventTicketTypes = ticketTypes.filter(
+    (type) => type.event_id === inventoryEventId,
+  );
+  const eventTickets = tickets.filter((ticket) =>
+    eventTicketTypes.some((type) => type.id === ticket.ticket_type_id),
+  );
+  const eventSeats = seats.filter(
+    (seat) => seat.venue_id === inventoryEvent?.venue_id,
+  );
 
-  function configFor(kind: Creatable): CreateConfig {
+  function formFor(kind: EntityKind, record?: EntityRecord): FormConfig {
+    const editing = Boolean(record);
     switch (kind) {
-      case "venue":
+      case "venue": {
+        const venue = record as Venue | undefined;
         return {
-          title: "New venue",
+          title: editing ? "Edit venue" : "New venue",
           description: "The building that hosts events and owns its seats.",
-          submitLabel: "Create venue",
+          submitLabel: editing ? "Save venue" : "Create venue",
           fields: [
-            { kind: "text", name: "name", label: "Name", placeholder: "The Grand Hall" },
+            {
+              kind: "text",
+              name: "name",
+              label: "Name",
+              placeholder: "The Grand Hall",
+              defaultValue: venue?.name,
+            },
             {
               kind: "select",
               name: "timezone",
               label: "Timezone",
               placeholder: "Choose a timezone",
               options: timezoneOptions(),
-              defaultValue: localTimezone(),
+              defaultValue: venue?.timezone ?? localTimezone(),
             },
             {
               kind: "text",
               name: "address",
               label: "Address",
               placeholder: "100 Broadway, New York, NY",
+              defaultValue: venue?.address,
             },
           ],
           submit: async (data) => {
-            const venue = await api.post<Venue>("/venues/", {
+            const body = {
               name: data.get("name"),
               timezone: data.get("timezone"),
               address: data.get("address"),
-            });
-            return `Created venue “${venue.name}”.`;
+            };
+            const saved = venue
+              ? await api.patch<Venue>(`/venues/${venue.id}`, body)
+              : await api.post<Venue>("/venues/", body);
+            return `${editing ? "Updated" : "Created"} venue “${saved.name}”.`;
           },
         };
-      case "seat":
+      }
+      case "seat": {
+        const seat = record as Seat | undefined;
         return {
-          title: "New seat",
+          title: editing ? "Edit seat" : "New seat",
           description: "Seats belong to a venue and are reused across events.",
-          submitLabel: "Create seat",
+          submitLabel: editing ? "Save seat" : "Create seat",
           fields: [
             {
               kind: "select",
@@ -144,37 +183,57 @@ export function ManagePage() {
               label: "Venue",
               placeholder: "Choose a venue",
               options: venueOptions,
+              defaultValue: seat ? String(seat.venue_id) : undefined,
             },
             {
               kind: "text",
               name: "section",
               label: "Section",
               placeholder: "Orchestra",
+              defaultValue: seat?.section,
             },
-            { kind: "text", name: "seat_row", label: "Row", placeholder: "A" },
-            { kind: "text", name: "seat_number", label: "Number", placeholder: "1" },
+            {
+              kind: "text",
+              name: "seat_row",
+              label: "Row",
+              placeholder: "A",
+              defaultValue: seat?.seat_row,
+            },
+            {
+              kind: "text",
+              name: "seat_number",
+              label: "Number",
+              placeholder: "1",
+              defaultValue: seat?.seat_number,
+            },
           ],
           submit: async (data) => {
-            const seat = await api.post<Seat>("/seats/", {
+            const body = {
               section: data.get("section"),
               seat_row: data.get("seat_row"),
               seat_number: data.get("seat_number"),
               venue_id: Number(data.get("venue_id")),
-            });
-            return `Created seat ${seatLabel(seat)}.`;
+            };
+            const saved = seat
+              ? await api.patch<Seat>(`/seats/${seat.id}`, body)
+              : await api.post<Seat>("/seats/", body);
+            return `${editing ? "Updated" : "Created"} seat ${seatLabel(saved)}.`;
           },
         };
-      case "event":
+      }
+      case "event": {
+        const event = record as Event | undefined;
         return {
-          title: "New event",
+          title: editing ? "Edit event" : "New event",
           description: "A dated performance at one of your venues.",
-          submitLabel: "Create event",
+          submitLabel: editing ? "Save event" : "Create event",
           fields: [
             {
               kind: "text",
               name: "name",
               label: "Event name",
               placeholder: "Late Set at the Grand Hall",
+              defaultValue: event?.name,
             },
             {
               kind: "select",
@@ -182,78 +241,100 @@ export function ManagePage() {
               label: "Venue",
               placeholder: "Choose a venue",
               options: venueOptions,
+              defaultValue: event ? String(event.venue_id) : undefined,
             },
             {
               kind: "datetime",
               name: "starts_at",
               label: "Starts",
-              defaultValue: toDatetimeLocal(nowUnix() + 86400),
+              defaultValue: toDatetimeLocal(event?.starts_at ?? nowUnix() + 86400),
             },
             {
               kind: "datetime",
               name: "ends_at",
               label: "Ends",
-              defaultValue: toDatetimeLocal(nowUnix() + 86400 + 7200),
+              defaultValue: toDatetimeLocal(
+                event?.ends_at ?? nowUnix() + 86400 + 7200,
+              ),
             },
           ],
           submit: async (data) => {
-            const event = await api.post<Event>("/events/", {
+            const body = {
               name: data.get("name"),
               venue_id: Number(data.get("venue_id")),
               starts_at: fromDatetimeLocal(String(data.get("starts_at"))),
               ends_at: fromDatetimeLocal(String(data.get("ends_at"))),
-            });
-            return `Created event “${event.name}”.`;
+            };
+            const saved = event
+              ? await api.patch<Event>(`/events/${event.id}`, body)
+              : await api.post<Event>("/events/", body);
+            return `${editing ? "Updated" : "Created"} event “${saved.name}”.`;
           },
         };
-      case "ticket-type":
+      }
+      case "ticket-type": {
+        const type = record as TicketType | undefined;
+        const eventId = type?.event_id ?? inventoryEvent?.id;
         return {
-          title: "New ticket type",
-          description: "A pricing tier for one event, such as VIP or GA.",
-          submitLabel: "Create ticket type",
+          title: editing ? "Edit ticket type" : "New ticket type",
+          description: inventoryEvent
+            ? `A pricing tier for ${inventoryEvent.name}.`
+            : "A pricing tier for one event, such as VIP or GA.",
+          submitLabel: editing ? "Save ticket type" : "Create ticket type",
           fields: [
             {
-              kind: "select",
-              name: "event_id",
-              label: "Event",
-              placeholder: "Choose an event",
-              options: eventOptions,
+              kind: "text",
+              name: "tier",
+              label: "Tier",
+              placeholder: "VIP",
+              defaultValue: type?.tier,
             },
-            { kind: "text", name: "tier", label: "Tier", placeholder: "VIP" },
           ],
           submit: async (data) => {
-            const type = await api.post<TicketType>("/ticket-types/", {
+            if (eventId == null) {
+              throw new Error("Open an event’s ticketing screen before adding a type.");
+            }
+            const body = {
               tier: data.get("tier"),
-              event_id: Number(data.get("event_id")),
-            });
-            return `Created ${type.tier} tier for ${eventName(type.event_id)}.`;
+              event_id: eventId,
+            };
+            const saved = type
+              ? await api.patch<TicketType>(`/ticket-types/${type.id}`, body)
+              : await api.post<TicketType>("/ticket-types/", body);
+            return `${editing ? "Updated" : "Created"} ${saved.tier} for ${eventName(saved.event_id)}.`;
           },
         };
-      case "ticket":
+      }
+      case "ticket": {
+        const ticket = record as Ticket | undefined;
         return {
-          title: "New ticket",
-          description: "One sellable seat at a given tier and price.",
-          submitLabel: "Create ticket",
+          title: editing ? "Edit ticket" : "New ticket",
+          description: inventoryEvent
+            ? `Sell a seat at ${inventoryEvent.name}.`
+            : "One sellable seat at a given tier and price.",
+          submitLabel: editing ? "Save ticket" : "Create ticket",
           fields: [
             {
               kind: "select",
               name: "ticket_type_id",
               label: "Ticket type",
               placeholder: "Choose a ticket type",
-              options: ticketTypes.map((type) => ({
-                value: String(type.id),
-                label: `${type.tier} · ${eventName(type.event_id)}`,
+              options: eventTicketTypes.map((item) => ({
+                value: String(item.id),
+                label: item.tier,
               })),
+              defaultValue: ticket ? String(ticket.ticket_type_id) : undefined,
             },
             {
               kind: "select",
               name: "seat_id",
               label: "Seat",
-              placeholder: "Choose a seat",
-              options: seats.map((seat) => ({
+              placeholder: "Choose a seat at this venue",
+              options: eventSeats.map((seat) => ({
                 value: String(seat.id),
-                label: `${seatLabel(seat)} · ${venueName(seat.venue_id)}`,
+                label: seatLabel(seat),
               })),
+              defaultValue: ticket ? String(ticket.seat_id) : undefined,
             },
             {
               kind: "number",
@@ -262,55 +343,77 @@ export function ManagePage() {
               placeholder: "45.00",
               min: "0",
               step: "0.01",
+              defaultValue: ticket ? (ticket.price / 100).toFixed(2) : undefined,
             },
           ],
           submit: async (data) => {
-            const ticket = await api.post<Ticket>("/tickets/", {
+            const body = {
               price: Math.round(Number(data.get("price")) * 100),
               seat_id: Number(data.get("seat_id")),
               ticket_type_id: Number(data.get("ticket_type_id")),
-            });
-            const seat = seats.find((item) => item.id === ticket.seat_id);
-            return `Created ${formatMoney(ticket.price)} ticket for ${
-              seat ? seatLabel(seat) : `seat #${ticket.seat_id}`
+            };
+            const saved = ticket
+              ? await api.patch<Ticket>(`/tickets/${ticket.id}`, body)
+              : await api.post<Ticket>("/tickets/", body);
+            const seat = seats.find((item) => item.id === saved.seat_id);
+            return `${editing ? "Updated" : "Created"} ${formatMoney(saved.price)} ticket for ${
+              seat ? seatLabel(seat) : `seat #${saved.seat_id}`
             }.`;
           },
         };
-      case "user":
+      }
+      case "user": {
+        const user = record as User | undefined;
         return {
-          title: "New buyer",
+          title: editing ? "Edit buyer" : "New buyer",
           description: "Buyers are attached to orders at checkout.",
-          submitLabel: "Create buyer",
+          submitLabel: editing ? "Save buyer" : "Create buyer",
           fields: [
-            { kind: "text", name: "name", label: "Name", placeholder: "Alex Rivera" },
+            {
+              kind: "text",
+              name: "name",
+              label: "Name",
+              placeholder: "Alex Rivera",
+              defaultValue: user?.name,
+            },
             {
               kind: "email",
               name: "email",
               label: "Email",
               placeholder: "alex@example.com",
+              defaultValue: user?.email,
             },
           ],
           submit: async (data) => {
-            const user = await api.post<User>("/users/", {
-              name: data.get("name"),
-              email: data.get("email"),
-            });
-            return `Created buyer ${user.name}.`;
+            const body = { name: data.get("name"), email: data.get("email") };
+            const saved = user
+              ? await api.patch<User>(`/users/${user.id}`, body)
+              : await api.post<User>("/users/", body);
+            return `${editing ? "Updated" : "Created"} buyer ${saved.name}.`;
           },
         };
-      case "tax-rate":
+      }
+      case "tax-rate": {
+        const rate = record as TaxRate | undefined;
         return {
-          title: "New tax rate",
+          title: editing ? "Edit tax rate" : "New tax rate",
           description: "Applied to the subtotal when an order is placed.",
-          submitLabel: "Create tax rate",
+          submitLabel: editing ? "Save tax rate" : "Create tax rate",
           fields: [
             {
               kind: "text",
               name: "jurisdiction",
               label: "Jurisdiction",
               placeholder: "NY",
+              defaultValue: rate?.jurisdiction,
             },
-            { kind: "text", name: "tax_type", label: "Tax type", placeholder: "sales" },
+            {
+              kind: "text",
+              name: "tax_type",
+              label: "Tax type",
+              placeholder: "sales",
+              defaultValue: rate?.tax_type,
+            },
             {
               kind: "number",
               name: "percent",
@@ -318,40 +421,64 @@ export function ManagePage() {
               placeholder: "8.875",
               min: "0",
               step: "0.001",
+              defaultValue: rate ? String(rate.rate * 100) : undefined,
             },
             {
               kind: "datetime",
               name: "effective_from",
               label: "Effective from",
-              defaultValue: toDatetimeLocal(nowUnix()),
+              defaultValue: toDatetimeLocal(rate?.effective_from ?? nowUnix()),
             },
           ],
           submit: async (data) => {
-            const rate = await api.post<TaxRate>("/tax-rates/", {
+            const body = {
               jurisdiction: data.get("jurisdiction"),
               tax_type: data.get("tax_type"),
               rate: Number(data.get("percent")) / 100,
               effective_from: fromDatetimeLocal(String(data.get("effective_from"))),
-            });
-            return `Created ${rate.jurisdiction} ${rate.tax_type} rate at ${(
-              rate.rate * 100
+            };
+            const saved = rate
+              ? await api.patch<TaxRate>(`/tax-rates/${rate.id}`, body)
+              : await api.post<TaxRate>("/tax-rates/", body);
+            return `${editing ? "Updated" : "Created"} ${saved.jurisdiction} ${saved.tax_type} rate at ${(
+              saved.rate * 100
             ).toFixed(3)}%.`;
           },
         };
+      }
     }
   }
 
-  function openCreate(kind: Creatable) {
+  function openCreate(kind: EntityKind) {
     setMessage(null);
     setError(null);
-    setCreating(kind);
+    setDialog({ action: "create", kind });
   }
 
-  async function handleCreate(config: CreateConfig, data: FormData) {
+  function openEdit(kind: EntityKind, record: EntityRecord) {
+    setMessage(null);
+    setError(null);
+    setDialog({ action: "edit", kind, record });
+  }
+
+  function openDelete(kind: EntityKind, id: number, label: string) {
+    setMessage(null);
+    setError(null);
+    setDialog({ action: "delete", kind, id, label });
+  }
+
+  async function handleSave(config: FormConfig, data: FormData) {
     const summary = await config.submit(data);
     await refresh();
-    setCreating(null);
+    setDialog(null);
     setMessage(summary);
+  }
+
+  async function handleDelete(kind: EntityKind, id: number, label: string) {
+    await api.delete(DELETE_PATH[kind](id));
+    await refresh();
+    setDialog(null);
+    setMessage(`Deleted ${label}.`);
   }
 
   async function seedHouse() {
@@ -422,7 +549,10 @@ export function ManagePage() {
     }
   }
 
-  const config = creating ? configFor(creating) : null;
+  const form =
+    dialog && dialog.action !== "delete"
+      ? formFor(dialog.kind, dialog.action === "edit" ? dialog.record : undefined)
+      : null;
 
   return (
     <section>
@@ -451,7 +581,6 @@ export function ManagePage() {
           [
             ["house", "Venues & seats"],
             ["events", "Events"],
-            ["inventory", "Tickets"],
             ["people", "Buyers"],
             ["tax", "Tax"],
           ] as const
@@ -460,7 +589,10 @@ export function ManagePage() {
             key={id}
             type="button"
             className={tab === id ? "tab active" : "tab"}
-            onClick={() => setTab(id)}
+            onClick={() => {
+              setTab(id);
+              setInventoryEventId(null);
+            }}
           >
             {label}
           </button>
@@ -484,6 +616,10 @@ export function ManagePage() {
                     {venue.address} · {venue.timezone}
                   </span>
                 </div>
+                <RowActions
+                  onEdit={() => openEdit("venue", venue)}
+                  onDelete={() => openDelete("venue", venue.id, `venue “${venue.name}”`)}
+                />
               </li>
             ))}
           </Collection>
@@ -500,13 +636,114 @@ export function ManagePage() {
                   <strong>{seatLabel(seat)}</strong>
                   <span>{venueName(seat.venue_id)}</span>
                 </div>
+                <RowActions
+                  onEdit={() => openEdit("seat", seat)}
+                  onDelete={() =>
+                    openDelete("seat", seat.id, `seat ${seatLabel(seat)}`)
+                  }
+                />
               </li>
             ))}
           </Collection>
         </div>
       )}
 
-      {tab === "events" && (
+      {tab === "events" && inventoryEvent && (
+        <section>
+          <div className="panel event-inventory-head">
+            <button
+              type="button"
+              className="ghost compact"
+              onClick={() => setInventoryEventId(null)}
+            >
+              ← All events
+            </button>
+            <div>
+              <p className="eyebrow">Ticketing</p>
+              <h2>{inventoryEvent.name}</h2>
+              <p className="hint">
+                {venueName(inventoryEvent.venue_id)} · {formatWhen(inventoryEvent.starts_at)}
+              </p>
+            </div>
+          </div>
+          <div className="split">
+            <Collection
+              title="Ticket types"
+              count={eventTicketTypes.length}
+              actionLabel="New ticket type"
+              onNew={() => openCreate("ticket-type")}
+              empty="No tiers yet. Add GA, VIP, or another type before selling seats."
+            >
+              {eventTicketTypes.map((type) => (
+                <li key={type.id}>
+                  <div>
+                    <strong>{type.tier}</strong>
+                    <span>
+                      {
+                        eventTickets.filter(
+                          (ticket) => ticket.ticket_type_id === type.id,
+                        ).length
+                      }{" "}
+                      tickets
+                    </span>
+                  </div>
+                  <RowActions
+                    onEdit={() => openEdit("ticket-type", type)}
+                    onDelete={() =>
+                      openDelete("ticket-type", type.id, `${type.tier} for ${inventoryEvent.name}`)
+                    }
+                  />
+                </li>
+              ))}
+            </Collection>
+            <Collection
+              title="Tickets"
+              count={eventTickets.length}
+              actionLabel="New ticket"
+              onNew={() => openCreate("ticket")}
+              empty={
+                eventTicketTypes.length === 0
+                  ? "Add a ticket type first, then create seats for this event."
+                  : eventSeats.length === 0
+                    ? "This venue has no seats yet. Add seats under Venues & seats."
+                    : "No tickets yet for this event."
+              }
+            >
+              {eventTickets.map((ticket) => {
+                const seat = seats.find((item) => item.id === ticket.seat_id);
+                const type = ticketTypes.find(
+                  (item) => item.id === ticket.ticket_type_id,
+                );
+                const label = seat ? seatLabel(seat) : `seat #${ticket.seat_id}`;
+                return (
+                  <li key={ticket.id}>
+                    <div>
+                      <strong>{label}</strong>
+                      <span>
+                        {type?.tier ?? `Type #${ticket.ticket_type_id}`} ·{" "}
+                        {formatMoney(ticket.price)}
+                      </span>
+                    </div>
+                    <div className="row-meta">
+                      <em className={ticket.sold_at ? "sold" : "available"}>
+                        {ticket.sold_at ? "Sold" : "Available"}
+                      </em>
+                      <RowActions
+                        onEdit={() => openEdit("ticket", ticket)}
+                        onDelete={() =>
+                          openDelete("ticket", ticket.id, `ticket for ${label}`)
+                        }
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </Collection>
+          </div>
+        </section>
+      )}
+
+      {tab === "events" && !inventoryEvent && (
         <Collection
           title="Events"
           count={events.length}
@@ -514,66 +751,43 @@ export function ManagePage() {
           onNew={() => openCreate("event")}
           empty="No events yet. Attendees only see events that exist here."
         >
-          {events.map((event) => (
-            <li key={event.id}>
-              <div>
-                <strong>{event.name}</strong>
-                <span>
-                  {venueName(event.venue_id)} · {formatWhen(event.starts_at)}
-                </span>
-              </div>
-            </li>
-          ))}
-        </Collection>
-      )}
-
-      {tab === "inventory" && (
-        <div className="split">
-          <Collection
-            title="Ticket types"
-            count={ticketTypes.length}
-            actionLabel="New ticket type"
-            onNew={() => openCreate("ticket-type")}
-            empty="No tiers yet. Every ticket needs a type."
-          >
-            {ticketTypes.map((type) => (
-              <li key={type.id}>
+          {events.map((event) => {
+            const ticketCount = tickets.filter((ticket) =>
+              ticketTypes.some(
+                (type) =>
+                  type.id === ticket.ticket_type_id && type.event_id === event.id,
+              ),
+            ).length;
+            return (
+              <li key={event.id}>
                 <div>
-                  <strong>{type.tier}</strong>
-                  <span>{eventName(type.event_id)}</span>
+                  <strong>{event.name}</strong>
+                  <span>
+                    {venueName(event.venue_id)} · {formatWhen(event.starts_at)} ·{" "}
+                    {ticketCount} tickets
+                  </span>
                 </div>
+                <RowActions
+                  extra={
+                    <button
+                      type="button"
+                      className="ghost compact"
+                      onClick={() => {
+                        setMessage(null);
+                        setError(null);
+                        setInventoryEventId(event.id);
+                      }}
+                    >
+                      Tickets
+                    </button>
+                  }
+                  onEdit={() => openEdit("event", event)}
+                  onDelete={() => openDelete("event", event.id, `event “${event.name}”`)}
+                />
               </li>
-            ))}
-          </Collection>
-          <Collection
-            title="Tickets"
-            count={tickets.length}
-            actionLabel="New ticket"
-            onNew={() => openCreate("ticket")}
-            empty="No tickets yet. Nothing is on sale until you add some."
-          >
-            {tickets.map((ticket) => {
-              const seat = seats.find((item) => item.id === ticket.seat_id);
-              const type = ticketTypes.find(
-                (item) => item.id === ticket.ticket_type_id,
-              );
-              return (
-                <li key={ticket.id}>
-                  <div>
-                    <strong>{seat ? seatLabel(seat) : `Seat #${ticket.seat_id}`}</strong>
-                    <span>
-                      {type?.tier ?? `Type #${ticket.ticket_type_id}`} ·{" "}
-                      {formatMoney(ticket.price)}
-                    </span>
-                  </div>
-                  <em className={ticket.sold_at ? "sold" : "available"}>
-                    {ticket.sold_at ? "Sold" : "Available"}
-                  </em>
-                </li>
-              );
-            })}
-          </Collection>
-        </div>
+            );
+          })}
+        </Collection>
       )}
 
       {tab === "people" && (
@@ -590,6 +804,10 @@ export function ManagePage() {
                 <strong>{user.name}</strong>
                 <span>{user.email}</span>
               </div>
+              <RowActions
+                onEdit={() => openEdit("user", user)}
+                onDelete={() => openDelete("user", user.id, `buyer ${user.name}`)}
+              />
             </li>
           ))}
         </Collection>
@@ -611,24 +829,67 @@ export function ManagePage() {
                 </strong>
                 <span>Effective {formatWhen(rate.effective_from)}</span>
               </div>
-              <em>{(rate.rate * 100).toFixed(3)}%</em>
+              <div className="row-meta">
+                <em>{(rate.rate * 100).toFixed(3)}%</em>
+                <RowActions
+                  onEdit={() => openEdit("tax-rate", rate)}
+                  onDelete={() =>
+                    openDelete(
+                      "tax-rate",
+                      rate.id,
+                      `${rate.jurisdiction} ${rate.tax_type} rate`,
+                    )
+                  }
+                />
+              </div>
             </li>
           ))}
         </Collection>
       )}
 
-      {config && (
+      {form && dialog && dialog.action !== "delete" && (
         <FormModal
-          key={creating}
-          title={config.title}
-          description={config.description}
-          fields={config.fields}
-          submitLabel={config.submitLabel}
-          onSubmit={(data) => handleCreate(config, data)}
-          onClose={() => setCreating(null)}
+          key={`${dialog.action}-${dialog.kind}-${dialog.action === "edit" ? dialog.record.id : "new"}`}
+          title={form.title}
+          description={form.description}
+          fields={form.fields}
+          submitLabel={form.submitLabel}
+          onSubmit={(data) => handleSave(form, data)}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.action === "delete" && (
+        <ConfirmModal
+          title="Delete this record?"
+          body={`This cannot be undone. ${dialog.label} will be removed if nothing else depends on it.`}
+          confirmLabel="Delete"
+          onConfirm={() => handleDelete(dialog.kind, dialog.id, dialog.label)}
+          onClose={() => setDialog(null)}
         />
       )}
     </section>
+  );
+}
+
+function RowActions({
+  extra,
+  onEdit,
+  onDelete,
+}: {
+  extra?: ReactNode;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="row-actions">
+      {extra}
+      <button type="button" className="ghost compact" onClick={onEdit}>
+        Edit
+      </button>
+      <button type="button" className="danger-ghost compact" onClick={onDelete}>
+        Delete
+      </button>
+    </div>
   );
 }
 
