@@ -10,15 +10,15 @@ class OrderRepo:
     def get() -> List[Order]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute('SELECT * FROM "order"')
+            cursor.execute("SELECT * FROM orders")
             items = cursor.fetchall()
-            return items
+            return [Order.model_validate(dict(item)) for item in items]
 
     @staticmethod
     def get_by_id(order_id: Optional[int]) -> Optional[Order]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute('SELECT * FROM "order" WHERE id = ?', (order_id,))
+            cursor.execute("SELECT * FROM orders WHERE id = ?", (order_id,))
             item = cursor.fetchone()
             if item:
                 item = dict(item)
@@ -30,8 +30,21 @@ class OrderRepo:
         with get_con() as con:
             cursor = con.cursor()
             cursor.execute(
-                'INSERT INTO "order"(status, user_id, total_price) VALUES (?, ?, ?)',
-                (order.status, order.user_id, order.total_price)
+                """
+                INSERT INTO orders(
+                    status, user_id, subtotal, tax_amount, total_charged,
+                    tax_rate_applied, tax_jurisdiction
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    order.status,
+                    order.user_id,
+                    order.subtotal,
+                    order.tax_amount,
+                    order.total_charged,
+                    order.tax_rate_applied,
+                    order.tax_jurisdiction,
+                ),
             )
             order_id = cursor.lastrowid
             con.commit()
@@ -44,7 +57,7 @@ class OrderRepo:
             set_q, vals = generate_sql_update_query_setter(order)
             if set_q is not None:
                 vals.append(order_id)
-                cursor.execute('UPDATE "order" ' + set_q + " WHERE id = ?", vals)
+                cursor.execute("UPDATE orders " + set_q + " WHERE id = ?", vals)
                 con.commit()
             return OrderRepo.get_by_id(order_id)
 
@@ -54,7 +67,7 @@ class OrderRepo:
             cursor = con.cursor()
             try:
                 cursor.execute("BEGIN")
-                cursor.execute('DELETE FROM "order" WHERE id = ?', (order_id,))
+                cursor.execute("DELETE FROM orders WHERE id = ?", (order_id,))
                 con.commit()
                 rows = cursor.rowcount
                 return rows > 0

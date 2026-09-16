@@ -1,5 +1,15 @@
-from api.rest.routers import user, venue, ticket, event, event_ticket, order, order_item
-from core.sql_db import migrate
+from api.rest.routers import (
+    event,
+    order,
+    order_item,
+    seat,
+    tax_rate,
+    ticket,
+    ticket_type,
+    user,
+    venue,
+)
+from api.core.sql_db import migrate
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -24,9 +34,11 @@ def create_app() -> FastAPI:
     new_app.include_router(venue.router)
     new_app.include_router(ticket.router)
     new_app.include_router(event.router)
-    new_app.include_router(event_ticket.router)
+    new_app.include_router(ticket_type.router)
     new_app.include_router(order.router)
     new_app.include_router(order_item.router)
+    new_app.include_router(seat.router)
+    new_app.include_router(tax_rate.router)
 
     return new_app
 

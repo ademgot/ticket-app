@@ -11,15 +11,15 @@ class UserRepo:
     def get() -> List[User]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute("SELECT * FROM user")
+            cursor.execute("SELECT * FROM users")
             users = cursor.fetchall()
-            return users
+            return [User.model_validate(dict(user)) for user in users]
 
     @staticmethod
     def get_by_id(user_id: Optional[int]) -> Optional[User]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute("SELECT * FROM user WHERE id = ?", (user_id,))
+            cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
             item = cursor.fetchone()
             if item:
                 item = dict(item)
@@ -30,7 +30,7 @@ class UserRepo:
     def create(user: CreateUser) -> Optional[User]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute("INSERT INTO user(name, email) VALUES (?, ?)", (user.name, user.email))
+            cursor.execute("INSERT INTO users(name, email) VALUES (?, ?)", (user.name, user.email))
             user_id = cursor.lastrowid
             con.commit()
         return UserRepo.get_by_id(user_id)
@@ -42,21 +42,21 @@ class UserRepo:
             set_q, vals = generate_sql_update_query_setter(user)
             if set_q is not None:
                 vals.append(user_id)
-                cursor.execute("UPDATE user " + set_q + " WHERE id = ?", vals)
+                cursor.execute("UPDATE users " + set_q + " WHERE id = ?", vals)
                 con.commit()
 
             return UserRepo.get_by_id(user_id)
 
     @staticmethod
-    def delete_by_id(user_id: Optional[int]) -> Optional[User]:
+    def delete_by_id(user_id: Optional[int]) -> bool:
         with get_con() as con:
             cursor = con.cursor()
             try:
                 cursor.execute("BEGIN")
-                cursor.execute("DELETE FROM user WHERE id = ?", (user_id,))
+                cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
                 con.commit()
                 rows = cursor.rowcount
                 return rows > 0
             except DatabaseError:
                 con.rollback()
-                return None
+                return False

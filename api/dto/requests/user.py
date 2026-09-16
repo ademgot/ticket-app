@@ -8,5 +8,5 @@ class CreateUser(BaseModel):
 
 
 class UpdateUser(BaseModel):
-    name: Optional[str] = Field()
-    email: Optional[str] = Field()
+    name: Optional[str] = Field(default=None)
+    email: Optional[str] = Field(default=None)

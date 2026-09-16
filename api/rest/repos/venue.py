@@ -10,15 +10,15 @@ class VenueRepo:
     def get() -> List[Venue]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute("SELECT * FROM venue")
+            cursor.execute("SELECT * FROM venues")
             items = cursor.fetchall()
-            return items
+            return [Venue.model_validate(dict(item)) for item in items]
 
     @staticmethod
     def get_by_id(venue_id: Optional[int]) -> Optional[Venue]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute("SELECT * FROM venue WHERE id = ?", (venue_id,))
+            cursor.execute("SELECT * FROM venues WHERE id = ?", (venue_id,))
             item = cursor.fetchone()
             if item:
                 item = dict(item)
@@ -29,7 +29,10 @@ class VenueRepo:
     def create(venue: CreateVenue) -> Optional[Venue]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute("INSERT INTO venue(capacity) VALUES (?)", (venue.capacity,))
+            cursor.execute(
+                "INSERT INTO venues(name, timezone, address) VALUES (?, ?, ?)",
+                (venue.name, venue.timezone, venue.address),
+            )
             venue_id = cursor.lastrowid
             con.commit()
         return VenueRepo.get_by_id(venue_id)
@@ -41,7 +44,7 @@ class VenueRepo:
             set_q, vals = generate_sql_update_query_setter(venue)
             if set_q is not None:
                 vals.append(venue_id)
-                cursor.execute("UPDATE venue " + set_q + " WHERE id = ?", vals)
+                cursor.execute("UPDATE venues " + set_q + " WHERE id = ?", vals)
                 con.commit()
             return VenueRepo.get_by_id(venue_id)
 
@@ -51,7 +54,7 @@ class VenueRepo:
             cursor = con.cursor()
             try:
                 cursor.execute("BEGIN")
-                cursor.execute("DELETE FROM venue WHERE id = ?", (venue_id,))
+                cursor.execute("DELETE FROM venues WHERE id = ?", (venue_id,))
                 con.commit()
                 rows = cursor.rowcount
                 return rows > 0
