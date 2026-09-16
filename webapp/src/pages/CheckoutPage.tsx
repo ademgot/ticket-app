@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import type {
@@ -10,6 +10,7 @@ import type {
   TicketType,
   User,
 } from "../api/types";
+import { FormModal } from "../components/FormModal";
 import { useCart } from "../cart";
 import { formatMoney, nowUnix, seatLabel } from "../lib/format";
 
@@ -24,8 +25,8 @@ export function CheckoutPage() {
   const [claimedIds, setClaimedIds] = useState<Set<number>>(new Set());
   const [userId, setUserId] = useState("");
   const [taxRateId, setTaxRateId] = useState("");
-  const [newName, setNewName] = useState("");
-  const [newEmail, setNewEmail] = useState("");
+  const [addingBuyer, setAddingBuyer] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -60,25 +61,20 @@ export function CheckoutPage() {
   const taxAmount = taxRate ? Math.round(subtotal * taxRate.rate) : 0;
   const total = subtotal + taxAmount;
 
-  async function createBuyer(event: FormEvent) {
-    event.preventDefault();
-    setError(null);
-    try {
-      const user = await api.post<User>("/users/", {
-        name: newName,
-        email: newEmail,
-      });
-      setUsers((current) => [...current, user]);
-      setUserId(String(user.id));
-      setNewName("");
-      setNewEmail("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not create buyer");
-    }
+  async function createBuyer(data: FormData) {
+    const user = await api.post<User>("/users/", {
+      name: data.get("name"),
+      email: data.get("email"),
+    });
+    setUsers((current) => [...current, user]);
+    setUserId(String(user.id));
+    setAddingBuyer(false);
+    setMessage(`Added buyer ${user.name} and selected them for this order.`);
   }
 
   async function placeOrder() {
     setError(null);
+    setMessage(null);
     if (!userId) {
       setError("Choose or create a buyer first.");
       return;
@@ -134,6 +130,7 @@ export function CheckoutPage() {
           <h1>Checkout</h1>
           <p>Seats stay in your cart until you pay or someone else claims them.</p>
         </div>
+        {message && <p className="banner success">{message}</p>}
         {error && <p className="banner error">{error}</p>}
         {selected.length === 0 ? (
           <p className="banner">
@@ -166,9 +163,9 @@ export function CheckoutPage() {
       <aside className="panel sticky">
         <h2>Buyer & tax</h2>
         <label>
-          Existing buyer
+          Buyer
           <select value={userId} onChange={(event) => setUserId(event.target.value)}>
-            <option value="">Select a user</option>
+            <option value="">Select a buyer</option>
             {users.map((user) => (
               <option key={user.id} value={user.id}>
                 {user.name} ({user.email})
@@ -176,24 +173,9 @@ export function CheckoutPage() {
             ))}
           </select>
         </label>
-        <form className="inline-form" onSubmit={createBuyer}>
-          <input
-            placeholder="New buyer name"
-            value={newName}
-            onChange={(event) => setNewName(event.target.value)}
-            required
-          />
-          <input
-            type="email"
-            placeholder="Email"
-            value={newEmail}
-            onChange={(event) => setNewEmail(event.target.value)}
-            required
-          />
-          <button type="submit" className="ghost">
-            Add buyer
-          </button>
-        </form>
+        <button type="button" className="ghost" onClick={() => setAddingBuyer(true)}>
+          New buyer
+        </button>
         <label>
           Tax rate
           <select
@@ -231,6 +213,24 @@ export function CheckoutPage() {
           {busy ? "Charging…" : "Place order"}
         </button>
       </aside>
+      {addingBuyer && (
+        <FormModal
+          title="New buyer"
+          description="The buyer this order is charged to."
+          submitLabel="Create buyer"
+          fields={[
+            { kind: "text", name: "name", label: "Name", placeholder: "Alex Rivera" },
+            {
+              kind: "email",
+              name: "email",
+              label: "Email",
+              placeholder: "alex@example.com",
+            },
+          ]}
+          onSubmit={createBuyer}
+          onClose={() => setAddingBuyer(false)}
+        />
+      )}
     </section>
   );
 }

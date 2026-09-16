@@ -7,7 +7,9 @@
   --line: #3b3228;
   --accent: #e08a3c;
   --accent-ink: #1a120c;
+  --field: #120e0b;
   --danger: #e36b5e;
+  --ok: #8fd18a;
   --shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   font-family: "IBM Plex Sans", system-ui, sans-serif;
   background: #0b0908;
@@ -60,6 +62,7 @@ body {
   --accent: #63cbd0;
   --accent-ink: #0b2023;
   --muted: #abc7c9;
+  --field: #0d181b;
   background:
     linear-gradient(rgba(99, 203, 208, 0.025) 1px, transparent 1px),
     linear-gradient(90deg, rgba(99, 203, 208, 0.025) 1px, transparent 1px),
@@ -282,6 +285,19 @@ nav a:hover {
   color: #ffd4ce;
 }
 
+.banner.success {
+  border-style: solid;
+  border-color: var(--ok);
+  color: #e4f6e2;
+}
+
+.empty {
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+}
+
 .event-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -319,12 +335,17 @@ nav a:hover {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  align-items: baseline;
+  align-items: center;
 }
 
 .panel-head h2,
 .panel h2 {
   margin: 0;
+}
+
+.panel-head .hint {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
 }
 
 .seat-list,
@@ -354,7 +375,7 @@ nav a:hover {
 }
 
 .seat-list li > div,
-.plain-list li,
+.plain-list li > div,
 .order-list a {
   display: grid;
   gap: 4px;
@@ -370,6 +391,16 @@ nav a:hover {
 .sold {
   color: var(--danger);
   font-style: normal;
+}
+
+.available {
+  color: var(--ok);
+  font-style: normal;
+}
+
+.plain-list em {
+  font-style: normal;
+  white-space: nowrap;
 }
 
 button {
@@ -409,8 +440,7 @@ button:disabled {
   align-self: start;
 }
 
-label,
-.inline-form {
+label {
   display: grid;
   gap: 8px;
 }
@@ -418,10 +448,64 @@ label,
 input,
 select {
   width: 100%;
-  background: #120e0b;
+  background: var(--field);
   color: var(--ink);
   border: 1px solid var(--line);
   padding: 10px 12px;
+}
+
+.modal {
+  width: min(540px, calc(100% - 32px));
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.modal::backdrop {
+  background: rgba(6, 5, 4, 0.72);
+}
+
+.modal__body {
+  display: grid;
+  gap: 14px;
+  padding: 24px;
+}
+
+.modal__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.modal__head h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.modal__close {
+  background: transparent;
+  color: var(--muted);
+  padding: 2px 8px;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.modal__close:hover {
+  color: var(--ink);
+}
+
+.modal__body .banner {
+  margin-bottom: 0;
+}
+
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
 }
 
 .totals {

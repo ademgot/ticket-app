@@ -36,3 +36,41 @@ export function seatLabel(seat: {
 }): string {
   return `${seat.section} · Row ${seat.seat_row} · Seat ${seat.seat_number}`;
 }
+
+const FALLBACK_TIMEZONES = [
+  "UTC",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Toronto",
+  "Europe/London",
+  "Europe/Paris",
+  "Asia/Tokyo",
+];
+
+export function ianaTimezones(): string[] {
+  const supported = Intl.supportedValuesOf?.("timeZone");
+  return supported?.length ? [...supported] : FALLBACK_TIMEZONES;
+}
+
+export function localTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+export function timezoneOptions(): { value: string; label: string }[] {
+  const now = new Date();
+  return ianaTimezones().map((zone) => {
+    const offset = new Intl.DateTimeFormat(undefined, {
+      timeZone: zone,
+      timeZoneName: "shortOffset",
+    })
+      .formatToParts(now)
+      .find((part) => part.type === "timeZoneName")?.value;
+    const name = zone.replaceAll("_", " ");
+    return {
+      value: zone,
+      label: offset ? `${name} (${offset})` : name,
+    };
+  });
+}

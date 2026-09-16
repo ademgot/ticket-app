@@ -1,4 +1,4 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api/client";
 import type {
   Event,
@@ -9,17 +9,40 @@ import type {
   User,
   Venue,
 } from "../api/types";
-import { fromDatetimeLocal, nowUnix, toDatetimeLocal } from "../lib/format";
+import { FormModal, type Field } from "../components/FormModal";
+import {
+  formatMoney,
+  formatWhen,
+  fromDatetimeLocal,
+  localTimezone,
+  nowUnix,
+  seatLabel,
+  timezoneOptions,
+  toDatetimeLocal,
+} from "../lib/format";
 
-type Tab =
-  | "house"
-  | "events"
-  | "inventory"
-  | "people"
-  | "tax";
+type Tab = "house" | "events" | "inventory" | "people" | "tax";
+
+type Creatable =
+  | "venue"
+  | "seat"
+  | "event"
+  | "ticket-type"
+  | "ticket"
+  | "user"
+  | "tax-rate";
+
+type CreateConfig = {
+  title: string;
+  description: string;
+  submitLabel: string;
+  fields: Field[];
+  submit: (data: FormData) => Promise<string>;
+};
 
 export function ManagePage() {
   const [tab, setTab] = useState<Tab>("house");
+  const [creating, setCreating] = useState<Creatable | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [seats, setSeats] = useState<Seat[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
@@ -61,6 +84,275 @@ export function ManagePage() {
   useEffect(() => {
     refresh().catch((err: Error) => setError(err.message));
   }, []);
+
+  const venueName = (venueId: number) =>
+    venues.find((venue) => venue.id === venueId)?.name ?? `Venue #${venueId}`;
+  const eventName = (eventId: number) =>
+    events.find((event) => event.id === eventId)?.name ?? `Event #${eventId}`;
+
+  const venueOptions = venues.map((venue) => ({
+    value: String(venue.id),
+    label: venue.name,
+  }));
+  const eventOptions = events.map((event) => ({
+    value: String(event.id),
+    label: event.name,
+  }));
+
+  function configFor(kind: Creatable): CreateConfig {
+    switch (kind) {
+      case "venue":
+        return {
+          title: "New venue",
+          description: "The building that hosts events and owns its seats.",
+          submitLabel: "Create venue",
+          fields: [
+            { kind: "text", name: "name", label: "Name", placeholder: "The Grand Hall" },
+            {
+              kind: "select",
+              name: "timezone",
+              label: "Timezone",
+              placeholder: "Choose a timezone",
+              options: timezoneOptions(),
+              defaultValue: localTimezone(),
+            },
+            {
+              kind: "text",
+              name: "address",
+              label: "Address",
+              placeholder: "100 Broadway, New York, NY",
+            },
+          ],
+          submit: async (data) => {
+            const venue = await api.post<Venue>("/venues/", {
+              name: data.get("name"),
+              timezone: data.get("timezone"),
+              address: data.get("address"),
+            });
+            return `Created venue “${venue.name}”.`;
+          },
+        };
+      case "seat":
+        return {
+          title: "New seat",
+          description: "Seats belong to a venue and are reused across events.",
+          submitLabel: "Create seat",
+          fields: [
+            {
+              kind: "select",
+              name: "venue_id",
+              label: "Venue",
+              placeholder: "Choose a venue",
+              options: venueOptions,
+            },
+            {
+              kind: "text",
+              name: "section",
+              label: "Section",
+              placeholder: "Orchestra",
+            },
+            { kind: "text", name: "seat_row", label: "Row", placeholder: "A" },
+            { kind: "text", name: "seat_number", label: "Number", placeholder: "1" },
+          ],
+          submit: async (data) => {
+            const seat = await api.post<Seat>("/seats/", {
+              section: data.get("section"),
+              seat_row: data.get("seat_row"),
+              seat_number: data.get("seat_number"),
+              venue_id: Number(data.get("venue_id")),
+            });
+            return `Created seat ${seatLabel(seat)}.`;
+          },
+        };
+      case "event":
+        return {
+          title: "New event",
+          description: "A dated performance at one of your venues.",
+          submitLabel: "Create event",
+          fields: [
+            {
+              kind: "text",
+              name: "name",
+              label: "Event name",
+              placeholder: "Late Set at the Grand Hall",
+            },
+            {
+              kind: "select",
+              name: "venue_id",
+              label: "Venue",
+              placeholder: "Choose a venue",
+              options: venueOptions,
+            },
+            {
+              kind: "datetime",
+              name: "starts_at",
+              label: "Starts",
+              defaultValue: toDatetimeLocal(nowUnix() + 86400),
+            },
+            {
+              kind: "datetime",
+              name: "ends_at",
+              label: "Ends",
+              defaultValue: toDatetimeLocal(nowUnix() + 86400 + 7200),
+            },
+          ],
+          submit: async (data) => {
+            const event = await api.post<Event>("/events/", {
+              name: data.get("name"),
+              venue_id: Number(data.get("venue_id")),
+              starts_at: fromDatetimeLocal(String(data.get("starts_at"))),
+              ends_at: fromDatetimeLocal(String(data.get("ends_at"))),
+            });
+            return `Created event “${event.name}”.`;
+          },
+        };
+      case "ticket-type":
+        return {
+          title: "New ticket type",
+          description: "A pricing tier for one event, such as VIP or GA.",
+          submitLabel: "Create ticket type",
+          fields: [
+            {
+              kind: "select",
+              name: "event_id",
+              label: "Event",
+              placeholder: "Choose an event",
+              options: eventOptions,
+            },
+            { kind: "text", name: "tier", label: "Tier", placeholder: "VIP" },
+          ],
+          submit: async (data) => {
+            const type = await api.post<TicketType>("/ticket-types/", {
+              tier: data.get("tier"),
+              event_id: Number(data.get("event_id")),
+            });
+            return `Created ${type.tier} tier for ${eventName(type.event_id)}.`;
+          },
+        };
+      case "ticket":
+        return {
+          title: "New ticket",
+          description: "One sellable seat at a given tier and price.",
+          submitLabel: "Create ticket",
+          fields: [
+            {
+              kind: "select",
+              name: "ticket_type_id",
+              label: "Ticket type",
+              placeholder: "Choose a ticket type",
+              options: ticketTypes.map((type) => ({
+                value: String(type.id),
+                label: `${type.tier} · ${eventName(type.event_id)}`,
+              })),
+            },
+            {
+              kind: "select",
+              name: "seat_id",
+              label: "Seat",
+              placeholder: "Choose a seat",
+              options: seats.map((seat) => ({
+                value: String(seat.id),
+                label: `${seatLabel(seat)} · ${venueName(seat.venue_id)}`,
+              })),
+            },
+            {
+              kind: "number",
+              name: "price",
+              label: "Price in dollars",
+              placeholder: "45.00",
+              min: "0",
+              step: "0.01",
+            },
+          ],
+          submit: async (data) => {
+            const ticket = await api.post<Ticket>("/tickets/", {
+              price: Math.round(Number(data.get("price")) * 100),
+              seat_id: Number(data.get("seat_id")),
+              ticket_type_id: Number(data.get("ticket_type_id")),
+            });
+            const seat = seats.find((item) => item.id === ticket.seat_id);
+            return `Created ${formatMoney(ticket.price)} ticket for ${
+              seat ? seatLabel(seat) : `seat #${ticket.seat_id}`
+            }.`;
+          },
+        };
+      case "user":
+        return {
+          title: "New buyer",
+          description: "Buyers are attached to orders at checkout.",
+          submitLabel: "Create buyer",
+          fields: [
+            { kind: "text", name: "name", label: "Name", placeholder: "Alex Rivera" },
+            {
+              kind: "email",
+              name: "email",
+              label: "Email",
+              placeholder: "alex@example.com",
+            },
+          ],
+          submit: async (data) => {
+            const user = await api.post<User>("/users/", {
+              name: data.get("name"),
+              email: data.get("email"),
+            });
+            return `Created buyer ${user.name}.`;
+          },
+        };
+      case "tax-rate":
+        return {
+          title: "New tax rate",
+          description: "Applied to the subtotal when an order is placed.",
+          submitLabel: "Create tax rate",
+          fields: [
+            {
+              kind: "text",
+              name: "jurisdiction",
+              label: "Jurisdiction",
+              placeholder: "NY",
+            },
+            { kind: "text", name: "tax_type", label: "Tax type", placeholder: "sales" },
+            {
+              kind: "number",
+              name: "percent",
+              label: "Percent",
+              placeholder: "8.875",
+              min: "0",
+              step: "0.001",
+            },
+            {
+              kind: "datetime",
+              name: "effective_from",
+              label: "Effective from",
+              defaultValue: toDatetimeLocal(nowUnix()),
+            },
+          ],
+          submit: async (data) => {
+            const rate = await api.post<TaxRate>("/tax-rates/", {
+              jurisdiction: data.get("jurisdiction"),
+              tax_type: data.get("tax_type"),
+              rate: Number(data.get("percent")) / 100,
+              effective_from: fromDatetimeLocal(String(data.get("effective_from"))),
+            });
+            return `Created ${rate.jurisdiction} ${rate.tax_type} rate at ${(
+              rate.rate * 100
+            ).toFixed(3)}%.`;
+          },
+        };
+    }
+  }
+
+  function openCreate(kind: Creatable) {
+    setMessage(null);
+    setError(null);
+    setCreating(kind);
+  }
+
+  async function handleCreate(config: CreateConfig, data: FormData) {
+    const summary = await config.submit(data);
+    await refresh();
+    setCreating(null);
+    setMessage(summary);
+  }
 
   async function seedHouse() {
     setBusy(true);
@@ -118,17 +410,19 @@ export function ManagePage() {
         effective_from: nowUnix() - 86400,
       });
       await refresh();
-      setMessage("Sample house loaded. Open Events to buy a seat.");
+      setMessage("Sample house loaded. Switch to the attendee view to buy a seat.");
     } catch (err) {
       setError(
         err instanceof Error
-          ? `${err.message} (If the house already exists, skip seed and use the forms.)`
+          ? `${err.message} (If the sample house already exists, create records individually instead.)`
           : "Seed failed",
       );
     } finally {
       setBusy(false);
     }
   }
+
+  const config = creating ? configFor(creating) : null;
 
   return (
     <section>
@@ -138,14 +432,19 @@ export function ManagePage() {
         <p>Stock the house: venues, seats, events, tickets, buyers, and tax.</p>
       </div>
       <div className="toolbar">
-        <button type="button" className="primary" disabled={busy} onClick={() => void seedHouse()}>
+        <button
+          type="button"
+          className="ghost"
+          disabled={busy}
+          onClick={() => void seedHouse()}
+        >
           {busy ? "Seeding…" : "Load sample house"}
         </button>
         <button type="button" className="ghost" onClick={() => void refresh()}>
           Refresh
         </button>
       </div>
-      {message && <p className="banner">{message}</p>}
+      {message && <p className="banner success">{message}</p>}
       {error && <p className="banner error">{error}</p>}
       <div className="tabs">
         {(
@@ -167,391 +466,203 @@ export function ManagePage() {
           </button>
         ))}
       </div>
+
       {tab === "house" && (
-        <HouseForms venues={venues} seats={seats} onChange={() => void refresh()} />
+        <div className="split">
+          <Collection
+            title="Venues"
+            count={venues.length}
+            actionLabel="New venue"
+            onNew={() => openCreate("venue")}
+            empty="No venues yet. Create one to start building the house."
+          >
+            {venues.map((venue) => (
+              <li key={venue.id}>
+                <div>
+                  <strong>{venue.name}</strong>
+                  <span>
+                    {venue.address} · {venue.timezone}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </Collection>
+          <Collection
+            title="Seats"
+            count={seats.length}
+            actionLabel="New seat"
+            onNew={() => openCreate("seat")}
+            empty="No seats yet. Seats are what tickets are sold against."
+          >
+            {seats.map((seat) => (
+              <li key={seat.id}>
+                <div>
+                  <strong>{seatLabel(seat)}</strong>
+                  <span>{venueName(seat.venue_id)}</span>
+                </div>
+              </li>
+            ))}
+          </Collection>
+        </div>
       )}
+
       {tab === "events" && (
-        <EventForms venues={venues} events={events} onChange={() => void refresh()} />
+        <Collection
+          title="Events"
+          count={events.length}
+          actionLabel="New event"
+          onNew={() => openCreate("event")}
+          empty="No events yet. Attendees only see events that exist here."
+        >
+          {events.map((event) => (
+            <li key={event.id}>
+              <div>
+                <strong>{event.name}</strong>
+                <span>
+                  {venueName(event.venue_id)} · {formatWhen(event.starts_at)}
+                </span>
+              </div>
+            </li>
+          ))}
+        </Collection>
       )}
+
       {tab === "inventory" && (
-        <InventoryForms
-          events={events}
-          seats={seats}
-          ticketTypes={ticketTypes}
-          tickets={tickets}
-          onChange={() => void refresh()}
+        <div className="split">
+          <Collection
+            title="Ticket types"
+            count={ticketTypes.length}
+            actionLabel="New ticket type"
+            onNew={() => openCreate("ticket-type")}
+            empty="No tiers yet. Every ticket needs a type."
+          >
+            {ticketTypes.map((type) => (
+              <li key={type.id}>
+                <div>
+                  <strong>{type.tier}</strong>
+                  <span>{eventName(type.event_id)}</span>
+                </div>
+              </li>
+            ))}
+          </Collection>
+          <Collection
+            title="Tickets"
+            count={tickets.length}
+            actionLabel="New ticket"
+            onNew={() => openCreate("ticket")}
+            empty="No tickets yet. Nothing is on sale until you add some."
+          >
+            {tickets.map((ticket) => {
+              const seat = seats.find((item) => item.id === ticket.seat_id);
+              const type = ticketTypes.find(
+                (item) => item.id === ticket.ticket_type_id,
+              );
+              return (
+                <li key={ticket.id}>
+                  <div>
+                    <strong>{seat ? seatLabel(seat) : `Seat #${ticket.seat_id}`}</strong>
+                    <span>
+                      {type?.tier ?? `Type #${ticket.ticket_type_id}`} ·{" "}
+                      {formatMoney(ticket.price)}
+                    </span>
+                  </div>
+                  <em className={ticket.sold_at ? "sold" : "available"}>
+                    {ticket.sold_at ? "Sold" : "Available"}
+                  </em>
+                </li>
+              );
+            })}
+          </Collection>
+        </div>
+      )}
+
+      {tab === "people" && (
+        <Collection
+          title="Buyers"
+          count={users.length}
+          actionLabel="New buyer"
+          onNew={() => openCreate("user")}
+          empty="No buyers yet. One is needed to place an order."
+        >
+          {users.map((user) => (
+            <li key={user.id}>
+              <div>
+                <strong>{user.name}</strong>
+                <span>{user.email}</span>
+              </div>
+            </li>
+          ))}
+        </Collection>
+      )}
+
+      {tab === "tax" && (
+        <Collection
+          title="Tax rates"
+          count={taxRates.length}
+          actionLabel="New tax rate"
+          onNew={() => openCreate("tax-rate")}
+          empty="No tax rates yet. Checkout needs at least one."
+        >
+          {taxRates.map((rate) => (
+            <li key={rate.id}>
+              <div>
+                <strong>
+                  {rate.jurisdiction} {rate.tax_type}
+                </strong>
+                <span>Effective {formatWhen(rate.effective_from)}</span>
+              </div>
+              <em>{(rate.rate * 100).toFixed(3)}%</em>
+            </li>
+          ))}
+        </Collection>
+      )}
+
+      {config && (
+        <FormModal
+          key={creating}
+          title={config.title}
+          description={config.description}
+          fields={config.fields}
+          submitLabel={config.submitLabel}
+          onSubmit={(data) => handleCreate(config, data)}
+          onClose={() => setCreating(null)}
         />
       )}
-      {tab === "people" && <PeopleForms users={users} onChange={() => void refresh()} />}
-      {tab === "tax" && <TaxForms rates={taxRates} onChange={() => void refresh()} />}
     </section>
   );
 }
 
-function HouseForms({
-  venues,
-  seats,
-  onChange,
+function Collection({
+  title,
+  count,
+  actionLabel,
+  onNew,
+  empty,
+  children,
 }: {
-  venues: Venue[];
-  seats: Seat[];
-  onChange: () => void;
+  title: string;
+  count: number;
+  actionLabel: string;
+  onNew: () => void;
+  empty: string;
+  children: ReactNode;
 }) {
-  const [venueId, setVenueId] = useState("");
-
-  async function createVenue(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    await api.post("/venues/", {
-      name: form.get("name"),
-      timezone: form.get("timezone"),
-      address: form.get("address"),
-    });
-    event.currentTarget.reset();
-    onChange();
-  }
-
-  async function createSeat(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    await api.post("/seats/", {
-      section: form.get("section"),
-      seat_row: form.get("seat_row"),
-      seat_number: form.get("seat_number"),
-      venue_id: Number(form.get("venue_id")),
-    });
-    event.currentTarget.reset();
-    onChange();
-  }
-
   return (
-    <div className="split">
-      <form className="panel" onSubmit={(event) => void createVenue(event)}>
-        <h2>New venue</h2>
-        <input name="name" placeholder="Name" required />
-        <input name="timezone" placeholder="America/New_York" required />
-        <input name="address" placeholder="Address" required />
-        <button type="submit" className="primary">
-          Save venue
+    <article className="panel">
+      <header className="panel-head">
+        <div>
+          <h2>{title}</h2>
+          <p className="hint">{count === 0 ? "Nothing yet" : `${count} total`}</p>
+        </div>
+        <button type="button" className="primary" onClick={onNew}>
+          {actionLabel}
         </button>
-        <ul className="plain-list">
-          {venues.map((venue) => (
-            <li key={venue.id}>
-              <strong>{venue.name}</strong>
-              <span>
-                {venue.address} · {venue.timezone}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </form>
-      <form className="panel" onSubmit={(event) => void createSeat(event)}>
-        <h2>New seat</h2>
-        <select
-          name="venue_id"
-          value={venueId}
-          onChange={(event) => setVenueId(event.target.value)}
-          required
-        >
-          <option value="">Venue</option>
-          {venues.map((venue) => (
-            <option key={venue.id} value={venue.id}>
-              {venue.name}
-            </option>
-          ))}
-        </select>
-        <input name="section" placeholder="Section" required />
-        <input name="seat_row" placeholder="Row" required />
-        <input name="seat_number" placeholder="Number" required />
-        <button type="submit" className="primary">
-          Save seat
-        </button>
-        <ul className="plain-list">
-          {seats.map((seat) => (
-            <li key={seat.id}>
-              {seat.section} {seat.seat_row}-{seat.seat_number}
-              <span>
-                {venues.find((venue) => venue.id === seat.venue_id)?.name ??
-                  `Venue #${seat.venue_id}`}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </form>
-    </div>
-  );
-}
-
-function EventForms({
-  venues,
-  events,
-  onChange,
-}: {
-  venues: Venue[];
-  events: Event[];
-  onChange: () => void;
-}) {
-  async function createEvent(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    await api.post("/events/", {
-      name: form.get("name"),
-      venue_id: Number(form.get("venue_id")),
-      starts_at: fromDatetimeLocal(String(form.get("starts_at"))),
-      ends_at: fromDatetimeLocal(String(form.get("ends_at"))),
-    });
-    event.currentTarget.reset();
-    onChange();
-  }
-
-  return (
-    <form className="panel" onSubmit={(event) => void createEvent(event)}>
-      <h2>New event</h2>
-      <input name="name" placeholder="Event name" required />
-      <select name="venue_id" required defaultValue="">
-        <option value="" disabled>
-          Venue
-        </option>
-        {venues.map((venue) => (
-          <option key={venue.id} value={venue.id}>
-            {venue.name}
-          </option>
-        ))}
-      </select>
-      <label>
-        Starts
-        <input
-          type="datetime-local"
-          name="starts_at"
-          defaultValue={toDatetimeLocal(nowUnix() + 86400)}
-          required
-        />
-      </label>
-      <label>
-        Ends
-        <input
-          type="datetime-local"
-          name="ends_at"
-          defaultValue={toDatetimeLocal(nowUnix() + 86400 + 7200)}
-          required
-        />
-      </label>
-      <button type="submit" className="primary">
-        Save event
-      </button>
-      <ul className="plain-list">
-        {events.map((item) => (
-          <li key={item.id}>
-            <strong>{item.name}</strong>
-            <span>
-              {venues.find((venue) => venue.id === item.venue_id)?.name ??
-                `Venue #${item.venue_id}`}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </form>
-  );
-}
-
-function InventoryForms({
-  events,
-  seats,
-  ticketTypes,
-  tickets,
-  onChange,
-}: {
-  events: Event[];
-  seats: Seat[];
-  ticketTypes: TicketType[];
-  tickets: Ticket[];
-  onChange: () => void;
-}) {
-  async function createType(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    await api.post("/ticket-types/", {
-      tier: form.get("tier"),
-      event_id: Number(form.get("event_id")),
-    });
-    event.currentTarget.reset();
-    onChange();
-  }
-
-  async function createTicket(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const dollars = Number(form.get("price"));
-    await api.post("/tickets/", {
-      price: Math.round(dollars * 100),
-      seat_id: Number(form.get("seat_id")),
-      ticket_type_id: Number(form.get("ticket_type_id")),
-    });
-    event.currentTarget.reset();
-    onChange();
-  }
-
-  return (
-    <div className="split">
-      <form className="panel" onSubmit={(event) => void createType(event)}>
-        <h2>Ticket type</h2>
-        <select name="event_id" required defaultValue="">
-          <option value="" disabled>
-            Event
-          </option>
-          {events.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-        <input name="tier" placeholder="VIP / GA" required />
-        <button type="submit" className="primary">
-          Save type
-        </button>
-        <ul className="plain-list">
-          {ticketTypes.map((type) => (
-            <li key={type.id}>
-              {type.tier}
-              <span>
-                {events.find((item) => item.id === type.event_id)?.name ??
-                  `Event #${type.event_id}`}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </form>
-      <form className="panel" onSubmit={(event) => void createTicket(event)}>
-        <h2>Inventory ticket</h2>
-        <select name="ticket_type_id" required defaultValue="">
-          <option value="" disabled>
-            Ticket type
-          </option>
-          {ticketTypes.map((type) => (
-            <option key={type.id} value={type.id}>
-              {type.tier} (
-              {events.find((item) => item.id === type.event_id)?.name ?? type.event_id})
-            </option>
-          ))}
-        </select>
-        <select name="seat_id" required defaultValue="">
-          <option value="" disabled>
-            Seat
-          </option>
-          {seats.map((seat) => (
-            <option key={seat.id} value={seat.id}>
-              {seat.section} {seat.seat_row}-{seat.seat_number}
-            </option>
-          ))}
-        </select>
-        <input
-          name="price"
-          type="number"
-          min="0"
-          step="0.01"
-          placeholder="Price in dollars"
-          required
-        />
-        <button type="submit" className="primary">
-          Save ticket
-        </button>
-        <p className="hint">{tickets.length} tickets in inventory</p>
-      </form>
-    </div>
-  );
-}
-
-function PeopleForms({
-  users,
-  onChange,
-}: {
-  users: User[];
-  onChange: () => void;
-}) {
-  async function createUser(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    await api.post("/users/", {
-      name: form.get("name"),
-      email: form.get("email"),
-    });
-    event.currentTarget.reset();
-    onChange();
-  }
-
-  return (
-    <form className="panel" onSubmit={(event) => void createUser(event)}>
-      <h2>Buyer</h2>
-      <input name="name" placeholder="Name" required />
-      <input name="email" type="email" placeholder="Email" required />
-      <button type="submit" className="primary">
-        Save buyer
-      </button>
-      <ul className="plain-list">
-        {users.map((user) => (
-          <li key={user.id}>
-            <strong>{user.name}</strong>
-            <span>{user.email}</span>
-          </li>
-        ))}
-      </ul>
-    </form>
-  );
-}
-
-function TaxForms({
-  rates,
-  onChange,
-}: {
-  rates: TaxRate[];
-  onChange: () => void;
-}) {
-  async function createRate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    await api.post("/tax-rates/", {
-      jurisdiction: form.get("jurisdiction"),
-      tax_type: form.get("tax_type"),
-      rate: Number(form.get("percent")) / 100,
-      effective_from: fromDatetimeLocal(String(form.get("effective_from"))),
-    });
-    event.currentTarget.reset();
-    onChange();
-  }
-
-  return (
-    <form className="panel" onSubmit={(event) => void createRate(event)}>
-      <h2>Tax rate</h2>
-      <input name="jurisdiction" placeholder="NY" required />
-      <input name="tax_type" placeholder="sales" required />
-      <input
-        name="percent"
-        type="number"
-        min="0"
-        step="0.01"
-        placeholder="Percent, e.g. 8.875"
-        required
-      />
-      <label>
-        Effective from
-        <input
-          type="datetime-local"
-          name="effective_from"
-          defaultValue={toDatetimeLocal(nowUnix())}
-          required
-        />
-      </label>
-      <button type="submit" className="primary">
-        Save rate
-      </button>
-      <ul className="plain-list">
-        {rates.map((rate) => (
-          <li key={rate.id}>
-            {rate.jurisdiction} {rate.tax_type}
-            <span>{(rate.rate * 100).toFixed(3)}%</span>
-          </li>
-        ))}
-      </ul>
-    </form>
+      </header>
+      {count === 0 ? (
+        <p className="empty">{empty}</p>
+      ) : (
+        <ul className="plain-list">{children}</ul>
+      )}
+    </article>
   );
 }
