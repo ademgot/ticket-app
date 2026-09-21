@@ -12,7 +12,7 @@ import type {
 } from "../api/types";
 import { FormModal } from "../components/FormModal";
 import { useCart } from "../cart";
-import { formatMoney, nowUnix, seatLabel } from "../lib/format";
+import { formatMoney, nowIso, seatLabel } from "../lib/format";
 
 export function CheckoutPage() {
   const { ticketIds, remove, clear } = useCart();
@@ -106,13 +106,18 @@ export function CheckoutPage() {
         tax_rate_applied: taxRate.rate,
         tax_jurisdiction: taxRate.jurisdiction,
       });
-      const soldAt = nowUnix();
+      const soldAt = nowIso();
       for (const ticket of selected) {
         await api.post("/order-items/", {
           order_id: order.id,
           ticket_id: ticket.id,
         });
-        await api.patch(`/tickets/${ticket.id}`, { sold_at: soldAt });
+        await api.patch(`/tickets/${ticket.id}`, {
+          sold_at: soldAt,
+          sold_to_user_id: Number(userId),
+          held_until: null,
+          held_by_user_id: null,
+        });
       }
       clear();
       navigate(`/user/orders/${order.id}`);

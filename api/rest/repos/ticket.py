@@ -18,7 +18,7 @@ class TicketRepo:
     def get_by_id(ticket_id: Optional[int]) -> Optional[Ticket]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
+            cursor.execute("SELECT * FROM tickets WHERE id = %s", (ticket_id,))
             item = cursor.fetchone()
             if item:
                 item = dict(item)
@@ -31,20 +31,18 @@ class TicketRepo:
             cursor = con.cursor()
             cursor.execute(
                 """
-                INSERT INTO tickets(
-                    price, held_until, sold_at, seat_id, event_id, ticket_type_id
-                ) VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO tickets(price, seat_id, event_id, ticket_type_id)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id
                 """,
                 (
                     ticket.price,
-                    ticket.held_until,
-                    ticket.sold_at,
                     ticket.seat_id,
                     ticket.event_id,
                     ticket.ticket_type_id,
                 ),
             )
-            ticket_id = cursor.lastrowid
+            ticket_id = cursor.fetchone()["id"]
             con.commit()
         return TicketRepo.get_by_id(ticket_id)
 
@@ -55,7 +53,7 @@ class TicketRepo:
             set_q, vals = generate_sql_update_query_setter(ticket)
             if set_q is not None:
                 vals.append(ticket_id)
-                cursor.execute("UPDATE tickets " + set_q + " WHERE id = ?", vals)
+                cursor.execute("UPDATE tickets " + set_q + " WHERE id = %s", vals)
                 con.commit()
             return TicketRepo.get_by_id(ticket_id)
 
@@ -65,7 +63,7 @@ class TicketRepo:
             cursor = con.cursor()
             try:
                 cursor.execute("BEGIN")
-                cursor.execute("DELETE FROM tickets WHERE id = ?", (ticket_id,))
+                cursor.execute("DELETE FROM tickets WHERE id = %s", (ticket_id,))
                 con.commit()
                 rows = cursor.rowcount
                 return rows > 0

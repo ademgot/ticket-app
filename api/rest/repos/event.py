@@ -18,7 +18,7 @@ class EventRepo:
     def get_by_id(event_id: Optional[int]) -> Optional[Event]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute("SELECT * FROM events WHERE id = ?", (event_id,))
+            cursor.execute("SELECT * FROM events WHERE id = %s", (event_id,))
             item = cursor.fetchone()
             if item:
                 item = dict(item)
@@ -30,10 +30,14 @@ class EventRepo:
         with get_con() as con:
             cursor = con.cursor()
             cursor.execute(
-                "INSERT INTO events(name, venue_id, starts_at, ends_at) VALUES (?, ?, ?, ?)",
+                """
+                INSERT INTO events(name, venue_id, starts_at, ends_at)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id
+                """,
                 (event.name, event.venue_id, event.starts_at, event.ends_at),
             )
-            event_id = cursor.lastrowid
+            event_id = cursor.fetchone()["id"]
             con.commit()
         return EventRepo.get_by_id(event_id)
 
@@ -44,7 +48,7 @@ class EventRepo:
             set_q, vals = generate_sql_update_query_setter(event)
             if set_q is not None:
                 vals.append(event_id)
-                cursor.execute("UPDATE events " + set_q + " WHERE id = ?", vals)
+                cursor.execute("UPDATE events " + set_q + " WHERE id = %s", vals)
                 con.commit()
             return EventRepo.get_by_id(event_id)
 
@@ -54,7 +58,7 @@ class EventRepo:
             cursor = con.cursor()
             try:
                 cursor.execute("BEGIN")
-                cursor.execute("DELETE FROM events WHERE id = ?", (event_id,))
+                cursor.execute("DELETE FROM events WHERE id = %s", (event_id,))
                 con.commit()
                 rows = cursor.rowcount
                 return rows > 0

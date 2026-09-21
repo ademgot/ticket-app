@@ -17,7 +17,7 @@ class TicketTypeRepo:
     def get_by_id(ticket_type_id: int | None) -> TicketType | None:
         with get_con() as con:
             item = con.execute(
-                "SELECT * FROM ticket_types WHERE id = ?", (ticket_type_id,)
+                "SELECT * FROM ticket_types WHERE id = %s", (ticket_type_id,)
             ).fetchone()
             return TicketType.model_validate(dict(item)) if item else None
 
@@ -25,10 +25,14 @@ class TicketTypeRepo:
     def create(ticket_type: CreateTicketType) -> TicketType | None:
         with get_con() as con:
             cursor = con.execute(
-                "INSERT INTO ticket_types(tier, event_id) VALUES (?, ?)",
+                """
+                INSERT INTO ticket_types(tier, event_id)
+                VALUES (%s, %s)
+                RETURNING id
+                """,
                 (ticket_type.tier, ticket_type.event_id),
             )
-            ticket_type_id = cursor.lastrowid
+            ticket_type_id = cursor.fetchone()["id"]
             con.commit()
         return TicketTypeRepo.get_by_id(ticket_type_id)
 
@@ -41,7 +45,7 @@ class TicketTypeRepo:
             if set_q is not None:
                 vals.append(ticket_type_id)
                 con.execute(
-                    "UPDATE ticket_types " + set_q + " WHERE id = ?", vals
+                    "UPDATE ticket_types " + set_q + " WHERE id = %s", vals
                 )
                 con.commit()
         return TicketTypeRepo.get_by_id(ticket_type_id)
@@ -51,7 +55,7 @@ class TicketTypeRepo:
         with get_con() as con:
             try:
                 cursor = con.execute(
-                    "DELETE FROM ticket_types WHERE id = ?", (ticket_type_id,)
+                    "DELETE FROM ticket_types WHERE id = %s", (ticket_type_id,)
                 )
                 con.commit()
                 return cursor.rowcount > 0

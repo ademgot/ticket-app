@@ -9,8 +9,8 @@ def generate_sql_update_query_setter(
 ) -> tuple[str | None, list[Any] | None]:
     fields = model.model_dump(exclude_unset=True)
     if fields:
-        assignments = [f"{name} = ?" for name in fields]
-        assignments.append("updated_at = unixepoch('now')")
+        assignments = [f"{name} = %s" for name in fields]
+        assignments.append("updated_at = NOW()")
         return "SET " + ", ".join(assignments), list(fields.values())
     return None, None
 

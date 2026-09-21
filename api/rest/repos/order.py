@@ -18,7 +18,7 @@ class OrderRepo:
     def get_by_id(order_id: Optional[int]) -> Optional[Order]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute("SELECT * FROM orders WHERE id = ?", (order_id,))
+            cursor.execute("SELECT * FROM orders WHERE id = %s", (order_id,))
             item = cursor.fetchone()
             if item:
                 item = dict(item)
@@ -34,7 +34,8 @@ class OrderRepo:
                 INSERT INTO orders(
                     status, user_id, subtotal, tax_amount, total_charged,
                     tax_rate_applied, tax_jurisdiction
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
                 """,
                 (
                     order.status,
@@ -46,7 +47,7 @@ class OrderRepo:
                     order.tax_jurisdiction,
                 ),
             )
-            order_id = cursor.lastrowid
+            order_id = cursor.fetchone()["id"]
             con.commit()
         return OrderRepo.get_by_id(order_id)
 
@@ -57,7 +58,7 @@ class OrderRepo:
             set_q, vals = generate_sql_update_query_setter(order)
             if set_q is not None:
                 vals.append(order_id)
-                cursor.execute("UPDATE orders " + set_q + " WHERE id = ?", vals)
+                cursor.execute("UPDATE orders " + set_q + " WHERE id = %s", vals)
                 con.commit()
             return OrderRepo.get_by_id(order_id)
 
@@ -67,7 +68,7 @@ class OrderRepo:
             cursor = con.cursor()
             try:
                 cursor.execute("BEGIN")
-                cursor.execute("DELETE FROM orders WHERE id = ?", (order_id,))
+                cursor.execute("DELETE FROM orders WHERE id = %s", (order_id,))
                 con.commit()
                 rows = cursor.rowcount
                 return rows > 0

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import time
-from sqlite3 import IntegrityError
+from datetime import datetime, timedelta, timezone
 
-from api.core.sql_db import migrate
+from psycopg import IntegrityError
+
 from api.dto.requests.event import CreateEvent
 from api.dto.requests.seat import CreateSeat
 from api.dto.requests.ticket import CreateTicket
@@ -97,7 +97,7 @@ def _get_or_create_seat(section: str, seat_row: str, seat_number: str, venue_id:
     return seat
 
 
-def _get_or_create_event(name: str, venue_id: int, starts_at: int, ends_at: int):
+def _get_or_create_event(name: str, venue_id: int, starts_at: datetime, ends_at: datetime):
     existing = next((event for event in EventRepo.get() if event.name == name), None)
     if existing:
         print(f"  event exists  {name}")
@@ -172,10 +172,7 @@ def _get_or_create_ticket(
 
 
 def main() -> None:
-    migrate()
-    now = int(time.time())
-    day = 24 * 3600
-    hour = 3600
+    now = datetime.now(timezone.utc)
 
     for venue_spec in VENUES:
         venue = _get_or_create_venue(
@@ -198,9 +195,9 @@ def main() -> None:
                 seats.append((seat, seat_spec["vip"]))
 
         for name, days_out, hours in venue_spec["events"]:
-            starts_at = now + days_out * day
+            starts_at = now + timedelta(days=days_out)
             event = _get_or_create_event(
-                name, venue.id, starts_at, starts_at + hours * hour
+                name, venue.id, starts_at, starts_at + timedelta(hours=hours)
             )
             if event is None or event.id is None:
                 continue

@@ -5,8 +5,10 @@ export function formatMoney(cents: number): string {
   }).format(cents / 100);
 }
 
-export function formatWhen(unixSeconds: number): string {
-  return new Date(unixSeconds * 1000).toLocaleString(undefined, {
+export function formatWhen(value: string | number): string {
+  const date =
+    typeof value === "number" ? new Date(value * 1000) : new Date(value);
+  return date.toLocaleString(undefined, {
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -15,18 +17,29 @@ export function formatWhen(unixSeconds: number): string {
   });
 }
 
-export function toDatetimeLocal(unixSeconds: number): string {
-  const date = new Date(unixSeconds * 1000);
-  const pad = (value: number) => String(value).padStart(2, "0");
+function toDate(value: string | number | Date): Date {
+  if (value instanceof Date) return value;
+  if (typeof value === "number") return new Date(value * 1000);
+  return new Date(value);
+}
+
+export function toDatetimeLocal(value: string | number | Date): string {
+  const date = toDate(value);
+  const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-export function fromDatetimeLocal(value: string): number {
-  return Math.floor(new Date(value).getTime() / 1000);
+/** Convert a datetime-local input value to an ISO-8601 string for the API. */
+export function fromDatetimeLocal(value: string): string {
+  return new Date(value).toISOString();
 }
 
-export function nowUnix(): number {
-  return Math.floor(Date.now() / 1000);
+export function nowIso(): string {
+  return new Date().toISOString();
+}
+
+export function hoursFromNowIso(hours: number): string {
+  return new Date(Date.now() + hours * 3600 * 1000).toISOString();
 }
 
 export function seatLabel(seat: {

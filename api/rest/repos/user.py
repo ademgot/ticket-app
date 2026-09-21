@@ -19,7 +19,7 @@ class UserRepo:
     def get_by_id(user_id: Optional[int]) -> Optional[User]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+            cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
             item = cursor.fetchone()
             if item:
                 item = dict(item)
@@ -30,8 +30,11 @@ class UserRepo:
     def create(user: CreateUser) -> Optional[User]:
         with get_con() as con:
             cursor = con.cursor()
-            cursor.execute("INSERT INTO users(name, email) VALUES (?, ?)", (user.name, user.email))
-            user_id = cursor.lastrowid
+            cursor.execute(
+                "INSERT INTO users(name, email) VALUES (%s, %s) RETURNING id",
+                (user.name, user.email),
+            )
+            user_id = cursor.fetchone()["id"]
             con.commit()
         return UserRepo.get_by_id(user_id)
 
@@ -42,7 +45,7 @@ class UserRepo:
             set_q, vals = generate_sql_update_query_setter(user)
             if set_q is not None:
                 vals.append(user_id)
-                cursor.execute("UPDATE users " + set_q + " WHERE id = ?", vals)
+                cursor.execute("UPDATE users " + set_q + " WHERE id = %s", vals)
                 con.commit()
 
             return UserRepo.get_by_id(user_id)
@@ -53,7 +56,7 @@ class UserRepo:
             cursor = con.cursor()
             try:
                 cursor.execute("BEGIN")
-                cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+                cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
                 con.commit()
                 rows = cursor.rowcount
                 return rows > 0

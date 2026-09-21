@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, Field
 
@@ -10,5 +11,5 @@ class Order(BaseModel):
     total_charged: int = Field()
     tax_rate_applied: float = Field()
     tax_jurisdiction: str = Field()
-    created_at: int = Field()
-    updated_at: int = Field()
+    created_at: datetime = Field()
+    updated_at: datetime = Field()

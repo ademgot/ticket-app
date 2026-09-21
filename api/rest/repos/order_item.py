@@ -18,7 +18,7 @@ class OrderItemRepo:
         with get_con() as con:
             cursor = con.cursor()
             cursor.execute(
-                "SELECT * FROM order_items WHERE order_id = ? AND ticket_id = ?",
+                "SELECT * FROM order_items WHERE order_id = %s AND ticket_id = %s",
                 (order_id, ticket_id),
             )
             item = cursor.fetchone()
@@ -32,7 +32,7 @@ class OrderItemRepo:
         with get_con() as con:
             cursor = con.cursor()
             cursor.execute(
-                "INSERT INTO order_items(order_id, ticket_id) VALUES (?, ?)",
+                "INSERT INTO order_items(order_id, ticket_id) VALUES (%s, %s)",
                 (order_item.order_id, order_item.ticket_id),
             )
             con.commit()
@@ -45,7 +45,7 @@ class OrderItemRepo:
             try:
                 cursor.execute("BEGIN")
                 cursor.execute(
-                    "DELETE FROM order_items WHERE order_id = ? AND ticket_id = ?",
+                    "DELETE FROM order_items WHERE order_id = %s AND ticket_id = %s",
                     (order_id, ticket_id),
                 )
                 con.commit()

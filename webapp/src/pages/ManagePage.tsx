@@ -14,8 +14,9 @@ import {
   formatMoney,
   formatWhen,
   fromDatetimeLocal,
+  hoursFromNowIso,
   localTimezone,
-  nowUnix,
+  nowIso,
   seatLabel,
   timezoneOptions,
   toDatetimeLocal,
@@ -249,14 +250,16 @@ export function ManagePage() {
               kind: "datetime",
               name: "starts_at",
               label: "Starts",
-              defaultValue: toDatetimeLocal(event?.starts_at ?? nowUnix() + 86400),
+              defaultValue: toDatetimeLocal(
+                event?.starts_at ?? hoursFromNowIso(24),
+              ),
             },
             {
               kind: "datetime",
               name: "ends_at",
               label: "Ends",
               defaultValue: toDatetimeLocal(
-                event?.ends_at ?? nowUnix() + 86400 + 7200,
+                event?.ends_at ?? hoursFromNowIso(26),
               ),
             },
           ],
@@ -434,7 +437,7 @@ export function ManagePage() {
               kind: "datetime",
               name: "effective_from",
               label: "Effective from",
-              defaultValue: toDatetimeLocal(rate?.effective_from ?? nowUnix()),
+              defaultValue: toDatetimeLocal(rate?.effective_from ?? nowIso()),
             },
           ],
           submit: async (data) => {
@@ -510,12 +513,15 @@ export function ManagePage() {
       for (const spec of seatSpecs) {
         createdSeats.push(await api.post<Seat>("/seats/", spec));
       }
-      const start = nowUnix() + 86400 * 7;
+      const start = hoursFromNowIso(24 * 7);
+      const ends = new Date(
+        new Date(start).getTime() + 3 * 3600 * 1000,
+      ).toISOString();
       const event = await api.post<Event>("/events/", {
         name: "Late Set at the Grand Hall",
         venue_id: venue.id,
         starts_at: start,
-        ends_at: start + 3 * 3600,
+        ends_at: ends,
       });
       const ga = await api.post<TicketType>("/ticket-types/", {
         tier: "General Admission",
@@ -542,7 +548,7 @@ export function ManagePage() {
         jurisdiction: "NY",
         tax_type: "sales",
         rate: 0.08875,
-        effective_from: nowUnix() - 86400,
+        effective_from: hoursFromNowIso(-24),
       });
       await refresh();
       setMessage("Sample house loaded. Switch to the attendee view to buy a seat.");

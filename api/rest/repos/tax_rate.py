@@ -17,7 +17,7 @@ class TaxRateRepo:
     def get_by_id(tax_rate_id: int | None) -> TaxRate | None:
         with get_con() as con:
             item = con.execute(
-                "SELECT * FROM tax_rates WHERE id = ?", (tax_rate_id,)
+                "SELECT * FROM tax_rates WHERE id = %s", (tax_rate_id,)
             ).fetchone()
             return TaxRate.model_validate(dict(item)) if item else None
 
@@ -28,7 +28,8 @@ class TaxRateRepo:
                 """
                 INSERT INTO tax_rates(
                     jurisdiction, tax_type, rate, effective_from, effective_to
-                ) VALUES (?, ?, ?, ?, ?)
+                ) VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
                 """,
                 (
                     tax_rate.jurisdiction,
@@ -38,7 +39,7 @@ class TaxRateRepo:
                     tax_rate.effective_to,
                 ),
             )
-            tax_rate_id = cursor.lastrowid
+            tax_rate_id = cursor.fetchone()["id"]
             con.commit()
         return TaxRateRepo.get_by_id(tax_rate_id)
 
@@ -48,7 +49,7 @@ class TaxRateRepo:
             set_q, vals = generate_sql_update_query_setter(tax_rate)
             if set_q is not None:
                 vals.append(tax_rate_id)
-                con.execute("UPDATE tax_rates " + set_q + " WHERE id = ?", vals)
+                con.execute("UPDATE tax_rates " + set_q + " WHERE id = %s", vals)
                 con.commit()
         return TaxRateRepo.get_by_id(tax_rate_id)
 
@@ -57,7 +58,7 @@ class TaxRateRepo:
         with get_con() as con:
             try:
                 cursor = con.execute(
-                    "DELETE FROM tax_rates WHERE id = ?", (tax_rate_id,)
+                    "DELETE FROM tax_rates WHERE id = %s", (tax_rate_id,)
                 )
                 con.commit()
                 return cursor.rowcount > 0

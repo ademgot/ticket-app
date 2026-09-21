@@ -9,7 +9,6 @@ from api.rest.routers import (
     user,
     venue,
 )
-from api.core.sql_db import migrate
 from api.core.utils.common import handle_integrity_error
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,7 +16,6 @@ from sqlite3 import IntegrityError
 
 
 def create_app() -> FastAPI:
-    migrate()
     new_app = FastAPI()
     new_app.add_exception_handler(IntegrityError, handle_integrity_error)
     new_app.add_middleware(
