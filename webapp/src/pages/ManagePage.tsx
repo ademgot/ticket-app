@@ -452,7 +452,7 @@ export function ManagePage() {
               : await api.post<TaxRate>("/tax-rates/", body);
             return `${editing ? "Updated" : "Created"} ${saved.jurisdiction} ${saved.tax_type} rate at ${(
               saved.rate * 100
-            ).toFixed(3)}%.`;
+            ).toFixed(4)}%.`;
           },
         };
       }
@@ -883,7 +883,7 @@ export function ManagePage() {
                 <span>Effective {formatWhen(rate.effective_from)}</span>
               </div>
               <div className="row-meta">
-                <em>{(rate.rate * 100).toFixed(3)}%</em>
+                <em>{(rate.rate * 100).toFixed(4)}%</em>
                 <RowActions
                   onEdit={() => openEdit("tax-rate", rate)}
                   onDelete={() =>
