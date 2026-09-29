@@ -1,4 +1,8 @@
 from readline import insert_text
+from string import ascii_uppercase
+from typing import LiteralString
+
+from psycopg.sql import Composed
 
 from api.core.sql_db import get_con
 from datetime import date, timedelta, datetime
@@ -93,6 +97,113 @@ def hydrate_event(num: int = 10000) -> bool:
     return _copy_table("events", cols, events)
 
 
+def hydrate_seats(rows_num: int = 50, sections=None, standing_sections=None) -> bool:
+    # Build query functions
+    def row_label(number: int) -> str:
+        label = ""
+        while number > 0:
+            number, remainder = divmod(number - 1, 26)
+            label = ascii_uppercase[remainder] + label
+        return label
+
+    def build_query(number_of_rows: int, secs: dict) -> Composed:
+        section_values = sql.SQL(", ").join(
+            sql.SQL("({}, {})").format(sql.Literal(label), sql.Literal(count))
+            for label, count in secs.items()
+        )
+
+        row_values = sql.SQL(", ").join(
+            sql.SQL("({})").format(sql.Literal(row_label(num)))
+            for num in range(1, number_of_rows + 1)
+        )
+        standing_section_values = sql.SQL(", ").join(
+            sql.SQL("({}, {})").format(sql.Literal(label), sql.Literal(count))
+            for label, count in standing_sections.items()
+        )
+        return sql.SQL("""
+                       INSERT INTO seats (section, seat_row, seat_number, venue_id)
+                       SELECT section.label  AS section,
+                              seat_row.label AS seat_row,
+                              seat.num       AS seat_number,
+                              venues.id      AS venue_id
+                       FROM (values {sections}) AS section(label, seat_num)
+                                CROSS JOIN venues
+                                CROSS JOIN (values {row_values}) AS seat_row(label)
+                                CROSS JOIN generate_series(1, section.seat_num) AS seat(num)
+                       UNION ALL
+                       SELECT section.label  AS section,
+                              seat_row.label AS seat_row,
+                              seat.num       AS seat_number,
+                              venues.id      AS venue_id
+                       FROM (values {standing_sections}) AS section(label, seat_num)
+                                CROSS JOIN venues
+                                CROSS JOIN (values ('special')) AS seat_row(label)
+                                CROSS JOIN generate_series(1, section.seat_num) AS seat(num);
+                       """).format(
+            sections=section_values,
+            row_values=row_values,
+            standing_sections=standing_section_values
+        )
+
+    # Generate query
+    if standing_sections is None:
+        standing_sections = {
+            "general": 5000,
+            "vip": 1000,
+        }
+    if sections is None:
+        sections = {
+            "front": 100,
+            "rear": 100,
+            "left": 100,
+            "right": 100,
+        }
+    query = build_query(rows_num, sections)
+    return _insert_table(query)
+
+
+def hydrate_ticket_types() -> bool:
+    return _insert_table("""
+                         INSERT INTO ticket_types(tier, event_id)
+                         SELECT t_type.label, id
+                         from events
+                                  CROSS JOIN (VALUES ('vip'), ('general')) AS t_type(label); \
+                         """)
+
+
+def hydrate_tickets() -> bool:
+    query = """
+            INSERT INTO tickets(price, seat_id, event_id, ticket_type_id)
+            SELECT 
+                CASE
+                    WHEN seats.section = 'vip' THEN 150
+                    WHEN seats.section = 'front' OR seats.section = 'general' THEN 100
+                    WHEN seats.section = 'left' OR seats.section = 'right' THEN 75
+                    ELSE 50
+                END                AS price,
+                   seats.id        AS seat_id,
+                   events.id       AS event_id,
+                   ticket_types.id AS ticket_type_id
+            FROM events
+                    INNER JOIN seats ON seats.venue_id = events.venue_id
+                    INNER JOIN ticket_types ON events.id = ticket_types.event_id
+                        AND ticket_types.tier = 
+                            CASE
+                                WHEN seats.section = 'vip' THEN 'vip'
+                                ELSE 'general'
+                            END;
+    """
+    return _insert_table(query)
+
+
+def hydrate_order_items(num: int = 1000000) -> bool:
+    pass
+
+
+def hydrate_orders(num: int = 1000000) -> bool:
+    pass
+
+
 def _copy_table(table_name: str, cols: list[str], data: list) -> bool:
     try:
         with get_con() as con:
@@ -105,45 +216,29 @@ def _copy_table(table_name: str, cols: list[str], data: list) -> bool:
                 for row in data:
                     copy.write_row(row)
             con.commit()
+            return True
     except DatabaseError as e:
         print(e)
         return False
-    return True
 
 
-def _generate_series_table(table_name: str, cols: list[str]) -> bool:
+def _insert_table(query:Composed|LiteralString) -> bool:
     try:
         with get_con() as con:
             cursor = con.cursor()
-            insert_query = """
-            select
-                section.label as section,
-                seat_row.label as row,
-                case
-                    when section.label = 'general' then seat.num + seat_row.offset_num
-                    else seat.num
-                end as seat,
-                venues.id
-            from (values ('general', 5), ('vip', 2)) as section(label, seat_num)
-            cross join venues
-            cross join (values(0, 'A'), (5, 'B'), (10, 'C')) as seat_row(offset_num, label)
-            cross join generate_series(1, section.seat_num) as seat(num)
-            order by venues.id, section, row, seat;
-            """
-            cursor.execute(insert_query)
-            check = cursor.fetchone()["id"]
+            cursor.execute(query)
             con.commit()
+            return True
     except DatabaseError as e:
         print(e)
         return False
-    return True if check else False
 
 
 def _get_table_ids(table_name: str) -> list[int]:
     try:
         with get_con() as con:
             cursor = con.cursor()
-            query = sql.SQL("SELECT id FROM {}").format(sql.Identifier(table_name))
+            query = sql.SQL("SELECT id FROM {table_name}").format(table_name=sql.Identifier(table_name))
             cursor.execute(query)
             return [row[0] for row in cursor.fetchall()]
     except DatabaseError as e:
