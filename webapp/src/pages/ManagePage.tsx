@@ -161,12 +161,20 @@ export function ManagePage() {
               placeholder: "100 Broadway, New York, NY",
               defaultValue: venue?.address,
             },
+            {
+              kind: "text",
+              name: "state",
+              label: "State",
+              placeholder: "NY",
+              defaultValue: venue?.state,
+            },
           ],
           submit: async (data) => {
             const body = {
               name: data.get("name"),
               timezone: data.get("timezone"),
               address: data.get("address"),
+              state: data.get("state"),
             };
             const saved = venue
               ? await api.patch<Venue>(`/venues/${venue.id}`, body)
@@ -500,6 +508,7 @@ export function ManagePage() {
         name: "The Grand Hall",
         timezone: "America/New_York",
         address: "100 Broadway, New York, NY",
+        state: "NY",
       });
       const seatSpecs = ["A", "B"].flatMap((row) =>
         ["1", "2", "3", "4"].map((number) => ({
@@ -628,7 +637,8 @@ export function ManagePage() {
               <p className="eyebrow">Seating</p>
               <h2>{inventoryVenue.name}</h2>
               <p className="hint">
-                {inventoryVenue.address} · {inventoryVenue.timezone}
+                {inventoryVenue.address} · {inventoryVenue.state} ·{" "}
+                {inventoryVenue.timezone}
               </p>
             </div>
           </div>
@@ -673,7 +683,8 @@ export function ManagePage() {
                 <div>
                   <strong>{venue.name}</strong>
                   <span>
-                    {venue.address} · {venue.timezone} · {seatCount} seats
+                    {venue.address} · {venue.state} · {venue.timezone} ·{" "}
+                    {seatCount} seats
                   </span>
                 </div>
                 <RowActions

@@ -14,6 +14,9 @@ migrate:
 seed:
 	PYTHONPATH=. .venv/bin/python scripts/seed_venues_events.py
 
+hydrate:
+	PYTHONPATH=. .venv/bin/python scripts/hydrate_db.py
+
 
 # API
 api:

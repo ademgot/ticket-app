@@ -36,7 +36,6 @@ TAX_RATES = [
     ("CA", "sales", 0.0975),
     ("IL", "sales", 0.1025),
     ("TX", "sales", 0.0825),
-    ("GB", "vat", 0.20),
 ]
 
 SEATS = [
@@ -64,13 +63,6 @@ VENUES = [
         "address": "1805 Geary Blvd, San Francisco, CA",
         "jurisdiction": "CA",
         "events": [("West Coast Double Bill", 10, 4)],
-    },
-    {
-        "name": "Royal Albert Hall",
-        "timezone": "Europe/London",
-        "address": "Kensington Gore, London",
-        "jurisdiction": "GB",
-        "events": [("Proms Chamber Night", 21, 3), ("Organ Recital", 28, 2)],
     },
     {
         "name": "Chicago Theatre",
@@ -114,13 +106,6 @@ VENUES = [
         "jurisdiction": "TX",
         "events": [("Longhorn Arts Showcase", 11, 3)],
     },
-    {
-        "name": "Barbican Centre",
-        "timezone": "Europe/London",
-        "address": "Silk St, London",
-        "jurisdiction": "GB",
-        "events": [("Barbican Contemporary Night", 25, 2)],
-    },
 ]
 
 # (buyer email, venue name, event name, seat labels like "A1")
@@ -128,7 +113,7 @@ SALES = [
     ("ada@example.com", "The Grand Hall", "Late Set at the Grand Hall", ["A1", "A2"]),
     ("grace@example.com", "The Fillmore", "West Coast Double Bill", ["B1"]),
     ("alan@example.com", "Chicago Theatre", "Windy City Jazz Night", ["A3"]),
-    ("katherine@example.com", "Royal Albert Hall", "Proms Chamber Night", ["B2", "B3"]),
+    ("katherine@example.com", "Symphony Center", "CSO Chamber Series", ["B2", "B3"]),
 ]
 
 # (holder email, venue name, event name, seat label)
@@ -180,13 +165,15 @@ def _get_or_create_tax_rate(
     return tax_rate
 
 
-def _get_or_create_venue(name: str, timezone_name: str, address: str):
+def _get_or_create_venue(name: str, timezone_name: str, address: str, state: str):
     existing = next((venue for venue in VenueRepo.get() if venue.name == name), None)
     if existing:
         print(f"venue exists  {name}")
         return existing
     venue = VenueRepo.create(
-        CreateVenue(name=name, timezone=timezone_name, address=address)
+        CreateVenue(
+            name=name, timezone=timezone_name, address=address, state=state
+        )
     )
     print(f"venue created {venue.name} (id={venue.id})")
     return venue
@@ -438,6 +425,7 @@ def main() -> None:
             venue_spec["name"],
             venue_spec["timezone"],
             venue_spec["address"],
+            venue_spec["jurisdiction"],
         )
         if venue is None or venue.id is None:
             continue

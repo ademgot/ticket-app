@@ -11,6 +11,7 @@ export type Venue = {
   name: string;
   timezone: string;
   address: string;
+  state: string;
   created_at: string;
   updated_at: string;
 };

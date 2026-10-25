@@ -7,5 +7,6 @@ class Venue(BaseModel):
     name: str = Field()
     timezone: str = Field()
     address: str = Field()
+    state: str = Field()
     created_at: datetime = Field()
     updated_at: datetime = Field()

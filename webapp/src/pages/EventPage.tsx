@@ -60,7 +60,7 @@ export function EventPage() {
         <h1>{event.name}</h1>
         <p>
           {formatWhen(event.starts_at)} — {formatWhen(event.ends_at)}
-          {venue ? ` · ${venue.address}` : ""}
+          {venue ? ` · ${venue.address}, ${venue.state}` : ""}
         </p>
       </div>
       {ticketTypes.length === 0 && (
