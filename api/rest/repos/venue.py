@@ -31,11 +31,11 @@ class VenueRepo:
             cursor = con.cursor()
             cursor.execute(
                 """
-                INSERT INTO venues(name, timezone, address)
-                VALUES (%s, %s, %s)
+                INSERT INTO venues(name, timezone, address, state)
+                VALUES (%s, %s, %s, %s)
                 RETURNING id
                 """,
-                (venue.name, venue.timezone, venue.address),
+                (venue.name, venue.timezone, venue.address, venue.state),
             )
             venue_id = cursor.fetchone()["id"]
             con.commit()

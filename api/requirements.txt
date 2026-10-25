@@ -5,3 +5,4 @@ pydantic
 pydantic-settings
 psycopg[binary]
 alembic
+faker

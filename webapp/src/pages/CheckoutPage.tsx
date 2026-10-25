@@ -190,7 +190,7 @@ export function CheckoutPage() {
             <option value="">Select a rate</option>
             {taxRates.map((rate) => (
               <option key={rate.id} value={rate.id}>
-                {rate.jurisdiction} {rate.tax_type} ({(rate.rate * 100).toFixed(2)}%)
+                {rate.jurisdiction} {rate.tax_type} ({(rate.rate * 100).toFixed(4)}%)
               </option>
             ))}
           </select>

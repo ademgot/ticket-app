@@ -52,7 +52,7 @@ export function OrderPage() {
         <h1>{buyer ? buyer.name : `User #${order.user_id}`}</h1>
         <p>
           {order.status} · {formatWhen(order.created_at)} · {order.tax_jurisdiction}{" "}
-          tax {(order.tax_rate_applied * 100).toFixed(2)}%
+          tax {(order.tax_rate_applied * 100).toFixed(4)}%
         </p>
       </div>
       <ul className="seat-list">
