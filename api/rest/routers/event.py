@@ -1,12 +1,15 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from api.dto.requests.event import CreateEvent, UpdateEvent
+from api.dto.requests.pagination import Pagination
+from api.dto.responses.event import EventResponse
+from api.dto.responses.page import Page
 from api.rest.repos.event import EventRepo
 
 router = APIRouter(prefix="/events", tags=["events"])
 
 @router.get("/")
-def get():
-    return EventRepo.get()
+def get(pagination: Pagination = Depends(Pagination.as_query)) -> Page[EventResponse]:
+    return EventRepo.get(pagination)
 
 @router.get("/{event_id}")
 def get_by_id(event_id: int):

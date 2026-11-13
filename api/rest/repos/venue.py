@@ -1,18 +1,24 @@
 from api.core.sql_db import get_con
 from api.rest.models.venue import Venue
+from api.rest.repos.base import BaseRepo
 from api.dto.requests.venue import CreateVenue, UpdateVenue
+from api.dto.requests.pagination import Pagination
+from api.dto.responses.page import Page
+from api.dto.responses.venue import VenueResponse
 from api.core.utils.common import generate_sql_update_query_setter
-from typing import Optional, List
+from typing import Optional
 from sqlite3 import DatabaseError
 
 class VenueRepo:
     @staticmethod
-    def get() -> List[Venue]:
-        with get_con() as con:
-            cursor = con.cursor()
-            cursor.execute("SELECT * FROM venues")
-            items = cursor.fetchall()
-            return [Venue.model_validate(dict(item)) for item in items]
+    def get(pagination: Pagination) -> Page[VenueResponse]:
+        rows, total = BaseRepo.get_page("venues", pagination)
+        return Page(
+            items=[VenueResponse.model_validate(row) for row in rows],
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
 
     @staticmethod
     def get_by_id(venue_id: Optional[int]) -> Optional[Venue]:

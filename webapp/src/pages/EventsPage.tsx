@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { Event, Venue } from "../api/types";
+import type { Event, Page, Venue } from "../api/types";
 import { formatWhen } from "../lib/format";
 
 export function EventsPage() {
@@ -10,10 +10,10 @@ export function EventsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([api.get<Event[]>("/events/"), api.get<Venue[]>("/venues/")])
-      .then(([eventList, venueList]) => {
-        setEvents(eventList);
-        setVenues(venueList);
+    Promise.all([api.get<Page<Event>>("/events/"), api.get<Page<Venue>>("/venues/")])
+      .then(([eventPage, venuePage]) => {
+        setEvents(eventPage.items);
+        setVenues(venuePage.items);
       })
       .catch((err: Error) => setError(err.message));
   }, []);

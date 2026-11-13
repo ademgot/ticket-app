@@ -1,6 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from api.dto.requests.pagination import Pagination
 from api.dto.requests.user import CreateUser, UpdateUser
+from api.dto.responses.page import Page
+from api.dto.responses.user import UserResponse
 from api.rest.repos.user import UserRepo
 
 
@@ -8,8 +11,8 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("/")
-def get():
-    return UserRepo.get()
+def get(pagination: Pagination = Depends(Pagination.as_query)) -> Page[UserResponse]:
+    return UserRepo.get(pagination)
 
 @router.get("/{user_id}")
 def get_by_id(user_id: int):

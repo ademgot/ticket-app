@@ -1,18 +1,24 @@
 from api.core.sql_db import get_con
 from api.rest.models.ticket import Ticket
+from api.rest.repos.base import BaseRepo
 from api.dto.requests.ticket import CreateTicket, UpdateTicket
+from api.dto.requests.pagination import Pagination
+from api.dto.responses.page import Page
+from api.dto.responses.ticket import TicketResponse
 from api.core.utils.common import generate_sql_update_query_setter
-from typing import Optional, List
+from typing import Optional
 from sqlite3 import DatabaseError
 
 class TicketRepo:
     @staticmethod
-    def get() -> List[Ticket]:
-        with get_con() as con:
-            cursor = con.cursor()
-            cursor.execute("SELECT * FROM tickets")
-            items = cursor.fetchall()
-            return [Ticket.model_validate(dict(item)) for item in items]
+    def get(pagination: Pagination) -> Page[TicketResponse]:
+        rows, total = BaseRepo.get_page("tickets", pagination)
+        return Page(
+            items=[TicketResponse.model_validate(row) for row in rows],
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
 
     @staticmethod
     def get_by_id(ticket_id: Optional[int]) -> Optional[Ticket]:

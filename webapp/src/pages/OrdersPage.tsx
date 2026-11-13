@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import type { Order, User } from "../api/types";
+import type { Order, Page, User } from "../api/types";
 import { formatMoney, formatWhen } from "../lib/format";
 
 export function OrdersPage() {
@@ -10,10 +10,10 @@ export function OrdersPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([api.get<Order[]>("/orders/"), api.get<User[]>("/users/")])
-      .then(([orderList, userList]) => {
-        setOrders(orderList);
-        setUsers(userList);
+    Promise.all([api.get<Page<Order>>("/orders/"), api.get<Page<User>>("/users/")])
+      .then(([orderPage, userPage]) => {
+        setOrders(orderPage.items);
+        setUsers(userPage.items);
       })
       .catch((err: Error) => setError(err.message));
   }, []);

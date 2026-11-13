@@ -1,19 +1,25 @@
 from api.core.sql_db import get_con
 from api.rest.models.user import User
+from api.rest.repos.base import BaseRepo
 from api.dto.requests.user import CreateUser, UpdateUser
+from api.dto.requests.pagination import Pagination
+from api.dto.responses.page import Page
+from api.dto.responses.user import UserResponse
 from api.core.utils.common import generate_sql_update_query_setter
-from typing import Optional, List
+from typing import Optional
 from sqlite3 import DatabaseError
 
 
 class UserRepo:
     @staticmethod
-    def get() -> List[User]:
-        with get_con() as con:
-            cursor = con.cursor()
-            cursor.execute("SELECT * FROM users")
-            users = cursor.fetchall()
-            return [User.model_validate(dict(user)) for user in users]
+    def get(pagination: Pagination) -> Page[UserResponse]:
+        rows, total = BaseRepo.get_page("users", pagination)
+        return Page(
+            items=[UserResponse.model_validate(row) for row in rows],
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
 
     @staticmethod
     def get_by_id(user_id: Optional[int]) -> Optional[User]:

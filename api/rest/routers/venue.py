@@ -1,12 +1,15 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from api.dto.requests.pagination import Pagination
 from api.dto.requests.venue import CreateVenue, UpdateVenue
+from api.dto.responses.page import Page
+from api.dto.responses.venue import VenueResponse
 from api.rest.repos.venue import VenueRepo
 
 router = APIRouter(prefix="/venues", tags=["venues"])
 
 @router.get("/")
-def get():
-    return VenueRepo.get()
+def get(pagination: Pagination = Depends(Pagination.as_query)) -> Page[VenueResponse]:
+    return VenueRepo.get(pagination)
 
 @router.get("/{venue_id}")
 def get_by_id(venue_id: int):

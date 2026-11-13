@@ -2,16 +2,24 @@ from sqlite3 import DatabaseError
 
 from api.core.sql_db import get_con
 from api.core.utils.common import generate_sql_update_query_setter
+from api.dto.requests.pagination import Pagination
 from api.dto.requests.seat import CreateSeat, UpdateSeat
+from api.dto.responses.page import Page
+from api.dto.responses.seat import SeatResponse
 from api.rest.models.seat import Seat
+from api.rest.repos.base import BaseRepo
 
 
 class SeatRepo:
     @staticmethod
-    def get() -> list[Seat]:
-        with get_con() as con:
-            items = con.execute("SELECT * FROM seats").fetchall()
-            return [Seat.model_validate(dict(item)) for item in items]
+    def get(pagination: Pagination) -> Page[SeatResponse]:
+        rows, total = BaseRepo.get_page("seats", pagination)
+        return Page(
+            items=[SeatResponse.model_validate(row) for row in rows],
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
 
     @staticmethod
     def get_by_id(seat_id: int | None) -> Seat | None:

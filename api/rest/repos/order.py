@@ -1,18 +1,24 @@
 from api.core.sql_db import get_con
 from api.rest.models.order import Order
+from api.rest.repos.base import BaseRepo
 from api.dto.requests.order import CreateOrder, UpdateOrder
+from api.dto.requests.pagination import Pagination
+from api.dto.responses.page import Page
+from api.dto.responses.order import OrderResponse
 from api.core.utils.common import generate_sql_update_query_setter
-from typing import Optional, List
+from typing import Optional
 from sqlite3 import DatabaseError
 
 class OrderRepo:
     @staticmethod
-    def get() -> List[Order]:
-        with get_con() as con:
-            cursor = con.cursor()
-            cursor.execute("SELECT * FROM orders")
-            items = cursor.fetchall()
-            return [Order.model_validate(dict(item)) for item in items]
+    def get(pagination: Pagination) -> Page[OrderResponse]:
+        rows, total = BaseRepo.get_page("orders", pagination)
+        return Page(
+            items=[OrderResponse.model_validate(row) for row in rows],
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
 
     @staticmethod
     def get_by_id(order_id: Optional[int]) -> Optional[Order]:

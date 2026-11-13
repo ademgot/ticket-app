@@ -2,16 +2,24 @@ from sqlite3 import DatabaseError
 
 from api.core.sql_db import get_con
 from api.core.utils.common import generate_sql_update_query_setter
+from api.dto.requests.pagination import Pagination
 from api.dto.requests.ticket_type import CreateTicketType, UpdateTicketType
+from api.dto.responses.page import Page
+from api.dto.responses.ticket_type import TicketTypeResponse
 from api.rest.models.ticket_type import TicketType
+from api.rest.repos.base import BaseRepo
 
 
 class TicketTypeRepo:
     @staticmethod
-    def get() -> list[TicketType]:
-        with get_con() as con:
-            items = con.execute("SELECT * FROM ticket_types").fetchall()
-            return [TicketType.model_validate(dict(item)) for item in items]
+    def get(pagination: Pagination) -> Page[TicketTypeResponse]:
+        rows, total = BaseRepo.get_page("ticket_types", pagination)
+        return Page(
+            items=[TicketTypeResponse.model_validate(row) for row in rows],
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
 
     @staticmethod
     def get_by_id(ticket_type_id: int | None) -> TicketType | None:

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api/client";
 import type {
   Event,
+  Page,
   Seat,
   TaxRate,
   Ticket,
@@ -84,21 +85,21 @@ export function ManagePage() {
       userList,
       rateList,
     ] = await Promise.all([
-      api.get<Venue[]>("/venues/"),
-      api.get<Seat[]>("/seats/"),
-      api.get<Event[]>("/events/"),
-      api.get<TicketType[]>("/ticket-types/"),
-      api.get<Ticket[]>("/tickets/"),
-      api.get<User[]>("/users/"),
-      api.get<TaxRate[]>("/tax-rates/"),
+      api.get<Page<Venue>>("/venues/"),
+      api.get<Page<Seat>>("/seats/"),
+      api.get<Page<Event>>("/events/"),
+      api.get<Page<TicketType>>("/ticket-types/"),
+      api.get<Page<Ticket>>("/tickets/"),
+      api.get<Page<User>>("/users/"),
+      api.get<Page<TaxRate>>("/tax-rates/"),
     ]);
-    setVenues(venueList);
-    setSeats(seatList);
-    setEvents(eventList);
-    setTicketTypes(typeList);
-    setTickets(ticketList);
-    setUsers(userList);
-    setTaxRates(rateList);
+    setVenues(venueList.items);
+    setSeats(seatList.items);
+    setEvents(eventList.items);
+    setTicketTypes(typeList.items);
+    setTickets(ticketList.items);
+    setUsers(userList.items);
+    setTaxRates(rateList.items);
   }
 
   useEffect(() => {

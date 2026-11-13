@@ -1,6 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from api.dto.requests.pagination import Pagination
 from api.dto.requests.tax_rate import CreateTaxRate, UpdateTaxRate
+from api.dto.responses.page import Page
+from api.dto.responses.tax_rate import TaxRateResponse
 from api.rest.repos.tax_rate import TaxRateRepo
 
 
@@ -8,8 +11,8 @@ router = APIRouter(prefix="/tax-rates", tags=["tax-rates"])
 
 
 @router.get("/")
-def get():
-    return TaxRateRepo.get()
+def get(pagination: Pagination = Depends(Pagination.as_query)) -> Page[TaxRateResponse]:
+    return TaxRateRepo.get(pagination)
 
 
 @router.get("/{tax_rate_id}")

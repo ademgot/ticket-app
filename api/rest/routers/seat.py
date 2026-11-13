@@ -1,6 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from api.dto.requests.pagination import Pagination
 from api.dto.requests.seat import CreateSeat, UpdateSeat
+from api.dto.responses.page import Page
+from api.dto.responses.seat import SeatResponse
 from api.rest.repos.seat import SeatRepo
 
 
@@ -8,8 +11,8 @@ router = APIRouter(prefix="/seats", tags=["seats"])
 
 
 @router.get("/")
-def get():
-    return SeatRepo.get()
+def get(pagination: Pagination = Depends(Pagination.as_query)) -> Page[SeatResponse]:
+    return SeatRepo.get(pagination)
 
 
 @router.get("/{seat_id}")

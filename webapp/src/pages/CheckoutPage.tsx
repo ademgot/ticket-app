@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type {
   Order,
   OrderItem,
+  Page,
   Seat,
   TaxRate,
   Ticket,
@@ -32,22 +33,22 @@ export function CheckoutPage() {
 
   useEffect(() => {
     Promise.all([
-      api.get<User[]>("/users/"),
-      api.get<TaxRate[]>("/tax-rates/"),
-      api.get<Ticket[]>("/tickets/"),
-      api.get<Seat[]>("/seats/"),
-      api.get<TicketType[]>("/ticket-types/"),
-      api.get<OrderItem[]>("/order-items/"),
+      api.get<Page<User>>("/users/"),
+      api.get<Page<TaxRate>>("/tax-rates/"),
+      api.get<Page<Ticket>>("/tickets/"),
+      api.get<Page<Seat>>("/seats/"),
+      api.get<Page<TicketType>>("/ticket-types/"),
+      api.get<Page<OrderItem>>("/order-items/"),
     ])
       .then(([userList, rates, ticketList, seatList, types, items]) => {
-        setUsers(userList);
-        setTaxRates(rates);
-        setTickets(ticketList);
-        setSeats(seatList);
-        setTicketTypes(types);
-        setClaimedIds(new Set(items.map((item) => item.ticket_id)));
-        if (userList[0]) setUserId(String(userList[0].id));
-        if (rates[0]) setTaxRateId(String(rates[0].id));
+        setUsers(userList.items);
+        setTaxRates(rates.items);
+        setTickets(ticketList.items);
+        setSeats(seatList.items);
+        setTicketTypes(types.items);
+        setClaimedIds(new Set(items.items.map((item) => item.ticket_id)));
+        if (userList.items[0]) setUserId(String(userList.items[0].id));
+        if (rates.items[0]) setTaxRateId(String(rates.items[0].id));
       })
       .catch((err: Error) => setError(err.message));
   }, []);

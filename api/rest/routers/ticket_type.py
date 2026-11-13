@@ -1,6 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from api.dto.requests.pagination import Pagination
 from api.dto.requests.ticket_type import CreateTicketType, UpdateTicketType
+from api.dto.responses.page import Page
+from api.dto.responses.ticket_type import TicketTypeResponse
 from api.rest.repos.ticket_type import TicketTypeRepo
 
 
@@ -8,8 +11,8 @@ router = APIRouter(prefix="/ticket-types", tags=["ticket-types"])
 
 
 @router.get("/")
-def get():
-    return TicketTypeRepo.get()
+def get(pagination: Pagination = Depends(Pagination.as_query)) -> Page[TicketTypeResponse]:
+    return TicketTypeRepo.get(pagination)
 
 
 @router.get("/{ticket_type_id}")

@@ -2,16 +2,24 @@ from sqlite3 import DatabaseError
 
 from api.core.sql_db import get_con
 from api.core.utils.common import generate_sql_update_query_setter
+from api.dto.requests.pagination import Pagination
 from api.dto.requests.tax_rate import CreateTaxRate, UpdateTaxRate
+from api.dto.responses.page import Page
+from api.dto.responses.tax_rate import TaxRateResponse
 from api.rest.models.tax_rate import TaxRate
+from api.rest.repos.base import BaseRepo
 
 
 class TaxRateRepo:
     @staticmethod
-    def get() -> list[TaxRate]:
-        with get_con() as con:
-            items = con.execute("SELECT * FROM tax_rates").fetchall()
-            return [TaxRate.model_validate(dict(item)) for item in items]
+    def get(pagination: Pagination) -> Page[TaxRateResponse]:
+        rows, total = BaseRepo.get_page("tax_rates", pagination)
+        return Page(
+            items=[TaxRateResponse.model_validate(row) for row in rows],
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
 
     @staticmethod
     def get_by_id(tax_rate_id: int | None) -> TaxRate | None:

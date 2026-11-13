@@ -1,17 +1,26 @@
 from api.core.sql_db import get_con
 from api.rest.models.order_item import OrderItem
+from api.rest.repos.base import BaseRepo
 from api.dto.requests.order_item import CreateOrderItem
-from typing import List
+from api.dto.requests.pagination import Pagination
+from api.dto.responses.order_item import OrderItemResponse
+from api.dto.responses.page import Page
 from sqlite3 import DatabaseError
 
 class OrderItemRepo:
     @staticmethod
-    def get() -> List[OrderItem]:
-        with get_con() as con:
-            cursor = con.cursor()
-            cursor.execute("SELECT * FROM order_items")
-            items = cursor.fetchall()
-            return [OrderItem.model_validate(dict(item)) for item in items]
+    def get(pagination: Pagination) -> Page[OrderItemResponse]:
+        rows, total = BaseRepo.get_page(
+            "order_items",
+            pagination,
+            order_by=("order_id", "ticket_id"),
+        )
+        return Page(
+            items=[OrderItemResponse.model_validate(row) for row in rows],
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
 
     @staticmethod
     def get_by_id(order_id: int, ticket_id: int) -> OrderItem | None:

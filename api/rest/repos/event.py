@@ -1,18 +1,24 @@
 from api.core.sql_db import get_con
 from api.rest.models.event import Event
+from api.rest.repos.base import BaseRepo
 from api.dto.requests.event import CreateEvent, UpdateEvent
+from api.dto.requests.pagination import Pagination
+from api.dto.responses.event import EventResponse
+from api.dto.responses.page import Page
 from api.core.utils.common import generate_sql_update_query_setter
-from typing import Optional, List
+from typing import Optional
 from sqlite3 import DatabaseError
 
 class EventRepo:
     @staticmethod
-    def get() -> List[Event]:
-        with get_con() as con:
-            cursor = con.cursor()
-            cursor.execute("SELECT * FROM events")
-            items = cursor.fetchall()
-            return [Event.model_validate(dict(item)) for item in items]
+    def get(pagination: Pagination) -> Page[EventResponse]:
+        rows, total = BaseRepo.get_page("events", pagination)
+        return Page(
+            items=[EventResponse.model_validate(row) for row in rows],
+            total=total,
+            page=pagination.page,
+            page_size=pagination.page_size,
+        )
 
     @staticmethod
     def get_by_id(event_id: Optional[int]) -> Optional[Event]:

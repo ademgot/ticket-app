@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type {
   Event,
   OrderItem,
+  Page,
   Seat,
   Ticket,
   TicketType,
@@ -27,19 +28,19 @@ export function EventPage() {
     if (!eventId) return;
     Promise.all([
       api.get<Event>(`/events/${eventId}`),
-      api.get<Venue[]>("/venues/"),
-      api.get<TicketType[]>("/ticket-types/"),
-      api.get<Ticket[]>("/tickets/"),
-      api.get<Seat[]>("/seats/"),
-      api.get<OrderItem[]>("/order-items/"),
+      api.get<Page<Venue>>("/venues/"),
+      api.get<Page<TicketType>>("/ticket-types/"),
+      api.get<Page<Ticket>>("/tickets/"),
+      api.get<Page<Seat>>("/seats/"),
+      api.get<Page<OrderItem>>("/order-items/"),
     ])
       .then(([loadedEvent, venues, types, ticketList, seatList, items]) => {
         setEvent(loadedEvent);
-        setVenue(venues.find((item) => item.id === loadedEvent.venue_id) ?? null);
-        setTicketTypes(types.filter((type) => type.event_id === loadedEvent.id));
-        setTickets(ticketList.filter((ticket) => ticket.event_id === loadedEvent.id));
-        setSeats(seatList);
-        setClaimedIds(new Set(items.map((item) => item.ticket_id)));
+        setVenue(venues.items.find((item) => item.id === loadedEvent.venue_id) ?? null);
+        setTicketTypes(types.items.filter((type) => type.event_id === loadedEvent.id));
+        setTickets(ticketList.items.filter((ticket) => ticket.event_id === loadedEvent.id));
+        setSeats(seatList.items);
+        setClaimedIds(new Set(items.items.map((item) => item.ticket_id)));
       })
       .catch((err: Error) => setError(err.message));
   }, [eventId]);

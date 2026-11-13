@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from psycopg import IntegrityError
 
 from api.dto.requests.event import CreateEvent
+from api.dto.requests.pagination import Pagination
 from api.dto.requests.order import CreateOrder
 from api.dto.requests.order_item import CreateOrderItem
 from api.dto.requests.seat import CreateSeat
@@ -123,8 +124,18 @@ HOLDS = [
 ]
 
 
+def _pages(fetch):
+    page_number = 1
+    while True:
+        page = fetch(Pagination(page=page_number, page_size=100))
+        yield from page.items
+        if page_number * page.page_size >= page.total:
+            return
+        page_number += 1
+
+
 def _get_or_create_user(name: str, email: str):
-    existing = next((user for user in UserRepo.get() if user.email == email), None)
+    existing = next((user for user in _pages(UserRepo.get) if user.email == email), None)
     if existing:
         print(f"user exists  {email}")
         return existing
@@ -139,7 +150,7 @@ def _get_or_create_tax_rate(
     existing = next(
         (
             tax_rate
-            for tax_rate in TaxRateRepo.get()
+            for tax_rate in _pages(TaxRateRepo.get)
             if tax_rate.jurisdiction == jurisdiction
             and tax_rate.tax_type == tax_type
             and tax_rate.effective_to is None
@@ -166,7 +177,7 @@ def _get_or_create_tax_rate(
 
 
 def _get_or_create_venue(name: str, timezone_name: str, address: str, state: str):
-    existing = next((venue for venue in VenueRepo.get() if venue.name == name), None)
+    existing = next((venue for venue in _pages(VenueRepo.get) if venue.name == name), None)
     if existing:
         print(f"venue exists  {name}")
         return existing
@@ -183,7 +194,7 @@ def _get_or_create_seat(section: str, seat_row: str, seat_number: str, venue_id:
     existing = next(
         (
             seat
-            for seat in SeatRepo.get()
+            for seat in _pages(SeatRepo.get)
             if seat.venue_id == venue_id
             and seat.section == section
             and seat.seat_row == seat_row
@@ -210,8 +221,12 @@ def _get_or_create_seat(section: str, seat_row: str, seat_number: str, venue_id:
     return seat
 
 
+def _find_event_by_name(name: str):
+    return next((event for event in _pages(EventRepo.get) if event.name == name), None)
+
+
 def _get_or_create_event(name: str, venue_id: int, starts_at: datetime, ends_at: datetime):
-    existing = next((event for event in EventRepo.get() if event.name == name), None)
+    existing = _find_event_by_name(name)
     if existing:
         print(f"  event exists  {name}")
         return existing
@@ -235,7 +250,7 @@ def _get_or_create_ticket_type(tier: str, event_id: int):
     existing = next(
         (
             ticket_type
-            for ticket_type in TicketTypeRepo.get()
+            for ticket_type in _pages(TicketTypeRepo.get)
             if ticket_type.event_id == event_id and ticket_type.tier == tier
         ),
         None,
@@ -260,7 +275,7 @@ def _get_or_create_ticket(
     existing = next(
         (
             ticket
-            for ticket in TicketRepo.get()
+            for ticket in _pages(TicketRepo.get)
             if ticket.event_id == event_id and ticket.seat_id == seat_id
         ),
         None,
@@ -285,8 +300,8 @@ def _get_or_create_ticket(
 
 
 def _find_ticket(event_id: int, seat_row: str, seat_number: str):
-    seats = {seat.id: seat for seat in SeatRepo.get()}
-    for ticket in TicketRepo.get():
+    seats = {seat.id: seat for seat in _pages(SeatRepo.get)}
+    for ticket in _pages(TicketRepo.get):
         if ticket.event_id != event_id:
             continue
         seat = seats.get(ticket.seat_id)
@@ -314,7 +329,7 @@ def _seed_sale(
         print(f"sale skipped missing refs for {event_name}")
         return
 
-    existing_order_ticket_ids = {item.ticket_id for item in OrderItemRepo.get()}
+    existing_order_ticket_ids = {item.ticket_id for item in _pages(OrderItemRepo.get)}
     tickets = []
     for label in seat_labels:
         seat_row, seat_number = label[0], label[1:]

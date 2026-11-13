@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import type {
   Order,
   OrderItem,
+  Page,
   Seat,
   Ticket,
   TicketType,
@@ -25,19 +26,19 @@ export function OrderPage() {
     if (!orderId) return;
     Promise.all([
       api.get<Order>(`/orders/${orderId}`),
-      api.get<OrderItem[]>("/order-items/"),
-      api.get<Ticket[]>("/tickets/"),
-      api.get<Seat[]>("/seats/"),
-      api.get<TicketType[]>("/ticket-types/"),
-      api.get<User[]>("/users/"),
+      api.get<Page<OrderItem>>("/order-items/"),
+      api.get<Page<Ticket>>("/tickets/"),
+      api.get<Page<Seat>>("/seats/"),
+      api.get<Page<TicketType>>("/ticket-types/"),
+      api.get<Page<User>>("/users/"),
     ])
       .then(([loaded, allItems, ticketList, seatList, typeList, users]) => {
         setOrder(loaded);
-        setItems(allItems.filter((item) => item.order_id === loaded.id));
-        setTickets(ticketList);
-        setSeats(seatList);
-        setTypes(typeList);
-        setBuyer(users.find((user) => user.id === loaded.user_id) ?? null);
+        setItems(allItems.items.filter((item) => item.order_id === loaded.id));
+        setTickets(ticketList.items);
+        setSeats(seatList.items);
+        setTypes(typeList.items);
+        setBuyer(users.items.find((user) => user.id === loaded.user_id) ?? null);
       })
       .catch((err: Error) => setError(err.message));
   }, [orderId]);
