@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from psycopg import sql
 
+from api.dto.requests.event import EventListFilters
 from api.dto.requests.pagination import Pagination
 from api.rest.repos.event import EventRepo
 from api.rest.routers.event import get
@@ -47,7 +48,7 @@ def connection(rows, total=0):
 
 
 def test_event_repo_get_returns_one_ordered_page():
-    with patch("api.rest.repos.base.get_con", return_value=connection([event_row()])):
+    with patch("api.rest.repos.event.get_con", return_value=connection([event_row()])):
         page = EventRepo.get(Pagination(page=2, page_size=1))
 
     assert page.total == 12
@@ -56,31 +57,49 @@ def test_event_repo_get_returns_one_ordered_page():
     assert page.items[0].id == 1
     assert page.items[0].name == "ACL Studio Session"
     query, params = connection.cursor.execute.call_args.args
-    assert params == (1, 1)
+    assert params == [1, 1]
     statement = render_sql(query)
     assert "FROM events" in statement
-    assert "ORDER BY id" in statement
+    assert "ORDER BY events.id" in statement
     assert "LIMIT %s OFFSET %s" in statement
     assert "_total" not in page.items[0].model_dump()
 
 
 def test_event_repo_get_counts_when_the_page_is_empty():
-    with patch("api.rest.repos.base.get_con", return_value=connection([], total=4)):
+    with patch("api.rest.repos.event.get_con", return_value=connection([], total=4)):
         page = EventRepo.get(Pagination(page=3, page_size=50))
 
     assert page.items == []
     assert page.total == 4
     assert connection.cursor.execute.call_count == 2
     count_query = connection.cursor.execute.call_args_list[1].args[0]
-    assert render_sql(count_query) == "SELECT COUNT(*) AS total FROM events"
+    statement = render_sql(count_query)
+    assert "COUNT(*) AS total" in statement
+    assert "FROM events" in statement
+    assert "JOIN venues" in statement
 
 
 def test_list_events_returns_the_page():
     row = event_row(_total=3)
-    with patch("api.rest.repos.base.get_con", return_value=connection([row])):
-        page = get(Pagination(page=2, page_size=1))
+    with patch("api.rest.repos.event.get_con", return_value=connection([row])):
+        page = get(
+            Pagination(page=2, page_size=1),
+            q=None,
+            location=None,
+            starts_after=None,
+            starts_before=None,
+        )
 
     assert page.total == 3
     assert page.page == 2
     assert page.page_size == 1
     assert page.items[0].name == "ACL Studio Session"
+
+
+def test_event_repo_get_filters_name_and_place():
+    filters = EventListFilters(q="100%", location="Austin")
+    with patch("api.rest.repos.event.get_con", return_value=connection([event_row()])):
+        EventRepo.get(Pagination(page=1, page_size=50), filters)
+
+    _query, params = connection.cursor.execute.call_args.args
+    assert params == ["%100\\%%", "%100\\%%", "%Austin%", "%Austin%", 50, 0]

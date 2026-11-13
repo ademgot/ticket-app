@@ -12,9 +12,9 @@ export function Layout({ role }: { role: Role }) {
       <div className="shell">
       <header className="masthead">
         <NavLink to={isUser ? "/user" : "/organizer"} className="brand">
-          <span className="brand-mark">BO</span>
+          <span className="brand-mark">TA</span>
           <span>
-            <strong>Box Office</strong>
+            <strong>ticket app</strong>
             <em>{isUser ? "Attendee view" : "Organizer workspace"}</em>
           </span>
         </NavLink>

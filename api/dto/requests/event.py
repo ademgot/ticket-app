@@ -13,3 +13,9 @@ class UpdateEvent(BaseModel):
     venue_id: Optional[int] = Field(default=None)
     starts_at: Optional[datetime] = Field(default=None)
     ends_at: Optional[datetime] = Field(default=None)
+
+class EventListFilters(BaseModel):
+    q: Optional[str] = None
+    location: Optional[str] = None
+    starts_after: Optional[datetime] = None
+    starts_before: Optional[datetime] = None

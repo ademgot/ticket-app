@@ -4,9 +4,9 @@ export function HomePage() {
   return (
     <main className="role-home">
       <div className="role-home__intro">
-        <span className="brand-mark">BO</span>
-        <p className="eyebrow">Box Office</p>
-        <h1>How are you using the box office today?</h1>
+        <span className="brand-mark">TA</span>
+        <p className="eyebrow">ticket app</p>
+        <h1>How are you using the ticket app today?</h1>
         <p>Choose a workspace. You can return here and switch at any time.</p>
       </div>
       <div className="role-grid">

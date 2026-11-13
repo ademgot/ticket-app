@@ -31,6 +31,7 @@ export type Event = {
   ends_at: string;
   created_at: string;
   updated_at: string;
+  venue_name?: string | null;
 };
 
 export type Seat = {

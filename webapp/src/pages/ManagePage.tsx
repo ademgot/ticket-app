@@ -1,5 +1,6 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { api } from "../api/client";
+import { pageUrl } from "../api/paging";
 import type {
   Event,
   Page,
@@ -11,6 +12,7 @@ import type {
   Venue,
 } from "../api/types";
 import { ConfirmModal, FormModal, type Field } from "../components/FormModal";
+import { Pager } from "../components/Pager";
 import {
   formatMoney,
   formatWhen,
@@ -65,17 +67,25 @@ export function ManagePage() {
   const [inventoryEventId, setInventoryEventId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<Dialog | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
+  const [venuePage, setVenuePage] = useState(1);
+  const [venueTotal, setVenueTotal] = useState(0);
   const [seats, setSeats] = useState<Seat[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
+  const [eventPage, setEventPage] = useState(1);
+  const [eventTotal, setEventTotal] = useState(0);
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [userPage, setUserPage] = useState(1);
+  const [userTotal, setUserTotal] = useState(0);
   const [taxRates, setTaxRates] = useState<TaxRate[]>([]);
+  const [taxPage, setTaxPage] = useState(1);
+  const [taxTotal, setTaxTotal] = useState(0);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function refresh() {
+  const refresh = useCallback(async () => {
     const [
       venueList,
       seatList,
@@ -85,26 +95,30 @@ export function ManagePage() {
       userList,
       rateList,
     ] = await Promise.all([
-      api.get<Page<Venue>>("/venues/"),
-      api.get<Page<Seat>>("/seats/"),
-      api.get<Page<Event>>("/events/"),
-      api.get<Page<TicketType>>("/ticket-types/"),
-      api.get<Page<Ticket>>("/tickets/"),
-      api.get<Page<User>>("/users/"),
-      api.get<Page<TaxRate>>("/tax-rates/"),
+      api.get<Page<Venue>>(pageUrl("/venues/", venuePage)),
+      api.get<Page<Seat>>(pageUrl("/seats/", 1)),
+      api.get<Page<Event>>(pageUrl("/events/", eventPage)),
+      api.get<Page<TicketType>>(pageUrl("/ticket-types/", 1)),
+      api.get<Page<Ticket>>(pageUrl("/tickets/", 1)),
+      api.get<Page<User>>(pageUrl("/users/", userPage)),
+      api.get<Page<TaxRate>>(pageUrl("/tax-rates/", taxPage)),
     ]);
     setVenues(venueList.items);
+    setVenueTotal(venueList.total);
     setSeats(seatList.items);
     setEvents(eventList.items);
+    setEventTotal(eventList.total);
     setTicketTypes(typeList.items);
     setTickets(ticketList.items);
     setUsers(userList.items);
+    setUserTotal(userList.total);
     setTaxRates(rateList.items);
-  }
+    setTaxTotal(rateList.total);
+  }, [venuePage, eventPage, userPage, taxPage]);
 
   useEffect(() => {
     refresh().catch((err: Error) => setError(err.message));
-  }, []);
+  }, [refresh]);
 
   const venueName = (venueId: number) =>
     venues.find((venue) => venue.id === venueId)?.name ?? `Venue #${venueId}`;
@@ -582,7 +596,7 @@ export function ManagePage() {
     <section>
       <div className="page-head">
         <p className="eyebrow">Organizer workspace</p>
-        <h1>Run the box office</h1>
+        <h1>Run the ticket app</h1>
         <p>Stock the house: venues, seats, events, tickets, buyers, and tax.</p>
       </div>
       <div className="toolbar">
@@ -671,6 +685,9 @@ export function ManagePage() {
         <Collection
           title="Venues"
           count={venues.length}
+          total={venueTotal}
+          page={venuePage}
+          onPage={setVenuePage}
           actionLabel="New venue"
           onNew={() => openCreate("venue")}
           empty="No venues yet. Create one to start building the house."
@@ -812,6 +829,9 @@ export function ManagePage() {
         <Collection
           title="Events"
           count={events.length}
+          total={eventTotal}
+          page={eventPage}
+          onPage={setEventPage}
           actionLabel="New event"
           onNew={() => openCreate("event")}
           empty="No events yet. Attendees only see events that exist here."
@@ -859,6 +879,9 @@ export function ManagePage() {
         <Collection
           title="Buyers"
           count={users.length}
+          total={userTotal}
+          page={userPage}
+          onPage={setUserPage}
           actionLabel="New buyer"
           onNew={() => openCreate("user")}
           empty="No buyers yet. One is needed to place an order."
@@ -882,6 +905,9 @@ export function ManagePage() {
         <Collection
           title="Tax rates"
           count={taxRates.length}
+          total={taxTotal}
+          page={taxPage}
+          onPage={setTaxPage}
           actionLabel="New tax rate"
           onNew={() => openCreate("tax-rate")}
           empty="No tax rates yet. Checkout needs at least one."
@@ -961,6 +987,9 @@ function RowActions({
 function Collection({
   title,
   count,
+  total,
+  page,
+  onPage,
   actionLabel,
   onNew,
   empty,
@@ -968,26 +997,36 @@ function Collection({
 }: {
   title: string;
   count: number;
+  total?: number;
+  page?: number;
+  onPage?: (page: number) => void;
   actionLabel: string;
   onNew: () => void;
   empty: string;
   children: ReactNode;
 }) {
+  const shownTotal = total ?? count;
   return (
     <article className="panel">
       <header className="panel-head">
         <div>
           <h2>{title}</h2>
-          <p className="hint">{count === 0 ? "Nothing yet" : `${count} total`}</p>
+          <p className="hint">{shownTotal === 0 ? "Nothing yet" : `${shownTotal} total`}</p>
         </div>
         <button type="button" className="primary" onClick={onNew}>
           {actionLabel}
         </button>
       </header>
-      {count === 0 ? (
+      {page != null && onPage && total != null && (
+        <Pager page={page} total={total} onPage={onPage} />
+      )}
+      {count === 0 && shownTotal === 0 ? (
         <p className="empty">{empty}</p>
       ) : (
         <ul className="plain-list">{children}</ul>
+      )}
+      {page != null && onPage && total != null && (
+        <Pager page={page} total={total} onPage={onPage} />
       )}
     </article>
   );

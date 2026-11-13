@@ -11,3 +11,4 @@ class EventResponse(BaseModel):
     ends_at: datetime = Field()
     created_at: datetime = Field()
     updated_at: datetime = Field()
+    venue_name: str | None = Field(default=None)
